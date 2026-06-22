@@ -1,0 +1,58 @@
+model Patient {
+    id            String   @id @default(uuid(7))
+    first_name    String   @db.VarChar(255)
+    last_name     String   @db.VarChar(255)
+    gender        String   @db.VarChar(10)
+    phone_number  String   @db.VarChar(25)
+    Country       String   @db.VarChar(100)
+    date_of_birth DateTime @db.Date
+
+    created_at          DateTime             @default(now()) @db.Timestamp(6)
+    updated_at          DateTime             @updatedAt @db.Timestamp(6)
+    personalizationData PersonalizationData?
+}
+
+model PersonalizationData {
+    id                   String              @id @default(uuid(7))
+    patient_id           String              @unique
+    patient              Patient             @relation(fields: [patient_id], references: [id], onDelete: Cascade)
+    procedure_id         String              @map("procedure_id")
+    procedure            Procedure           @relation(fields: [procedure_id], references: [id], onDelete: Cascade)
+    createdAt            DateTime            @default(now()) @map("created_at")
+    updatedAt            DateTime            @updatedAt @map("updated_at")
+    treatmentProcedure   TreatmentProcedure? @relation(fields: [treatmentProcedureId], references: [id])
+    treatmentProcedureId String?
+
+    @@map("personalization_data")
+}
+
+model Procedure {
+    id                   String                @id @default(uuid(7))
+    user_id              String                @unique
+    user                 User                  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+    name                 String                @db.VarChar(255)
+    price                Decimal               @db.Decimal(10, 2)
+    notes                String                @db.Text
+    isDeleted            Boolean               @default(false)
+    deletedAt            DateTime?             @db.Timestamp(6)
+    createdAt            DateTime              @default(now()) @db.Timestamp(6)
+    updatedAt            DateTime              @updatedAt @db.Timestamp(6)
+    personalizationDatas PersonalizationData[]
+
+    @@map("procedure")
+}
+
+model TreatmentProcedure {
+    id                   String                @id @default(uuid(7))
+    dentist_id           String                @unique
+    name                 String                @db.VarChar(255)
+    price                Decimal               @db.Decimal(10, 2)
+    notes                String                @db.Text
+    isDeleted            Boolean               @default(false)
+    deletedAt            DateTime?             @db.Timestamp(6)
+    createdAt            DateTime              @default(now()) @db.Timestamp(6)
+    updatedAt            DateTime              @updatedAt @db.Timestamp(6)
+    personalizationDatas PersonalizationData[]
+
+    @@map("treatment_procedure")
+}
