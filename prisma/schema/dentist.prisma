@@ -1,0 +1,172 @@
+model Dentist {
+  id           String     @id @default(cuid())
+  userId       String     @unique @map("user_id")
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phoneNumber  String     @map("phone_number") @db.VarChar(25)
+  country      String     @db.VarChar(100)
+  referralCode String?    @unique @map("referral_code") @db.VarChar(50)
+  specialtyId  String?    @map("specialty_id")
+  specialty    Specialty? @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
+
+  createdAt                      DateTime                        @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt                      DateTime                        @updatedAt @map("updated_at") @db.Timestamp(6)
+  dentistProfessionalData        DentistProfessionalData?
+  dentistLicenseVerifications    DentistLicenseVerification[]
+  dentistLicense                 DentistLicense?
+  dentistOperationsVerifications DentistOperationsVerification[]
+  dentistProcedures              DentistProcedure[]
+  dentistClinicDepthVerification DentistClinicDepthVerification?
+  dentistVerificationProgress    DentistVerificationProgress?
+  treatmentPlans                 TreatmentPlan[]
+
+  @@index([userId])
+  @@index([phoneNumber])
+  @@index([country])
+  @@index([specialtyId])
+  @@map("dentists")
+}
+
+model DentistProfessionalData {
+  id        String  @id @default(cuid())
+  dentistId String  @unique @map("dentist_id")
+  dentist   Dentist @relation(fields: [dentistId], references: [id], onDelete: Cascade)
+  legalName String  @map("legal_name") @db.VarChar(255)
+
+  @@index([dentistId])
+  @@map("dentist_professional_data")
+}
+
+model Specialty {
+  id          String   @id @default(uuid(7))
+  name        String   @unique @db.VarChar(255)
+  slug        String   @unique
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  procedures GlobalProcedure[]
+  dentists   Dentist[]
+
+  @@map("specialty")
+}
+
+model DentistLicense {
+  id                    String                    @id @default(uuid(7))
+  dentistId             String                    @unique @map("dentist_id")
+  dentist               Dentist                   @relation(fields: [dentistId], references: [id], onDelete: Cascade)
+  country               String                    @db.VarChar(100)
+  city                  String                    @db.VarChar(100)
+  registrationAuthority String                    @map("registration_authority") @db.VarChar(255)
+  registrationNumber    String                    @unique @map("registration_number")
+  licenseDocument       String?                   @map("license_document") @db.VarChar(255)
+  verificationStatus    LicenseVerificationStatus @default(PENDING) @map("verification_status")
+  isVerified            Boolean                   @default(false) @map("is_verified")
+  verifiedAt            DateTime?                 @map("verified_at") @db.Timestamp(6)
+  verifiedBy            LicenseVerifiedBy?        @default(PLATFORM) @map("verified_by")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  @@index([dentistId, verificationStatus])
+  @@map("dentist_license")
+}
+
+model DentistLicenseVerification {
+  id                      String                    @id @default(uuid(7))
+  dentistId               String                    @map("dentist_id")
+  dentist                 Dentist                   @relation(fields: [dentistId], references: [id], onDelete: Cascade)
+  verificationStatus      LicenseVerificationStatus @default(PENDING) @map("verification_status")
+  isVerified              Boolean                   @default(false) @map("is_verified")
+  verifiedAt              DateTime?                 @map("verified_at") @db.Timestamp(6)
+  verifiedBy              LicenseVerifiedBy?        @default(PLATFORM) @map("verified_by")
+  verificationNote        String?                   @map("verification_note") @db.VarChar(255)
+  verificationRequestNote String?                   @map("verification_request_note") @db.VarChar(255)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  @@index([dentistId])
+  @@map("dentist_license_verification")
+}
+
+model DentistOperationsVerification {
+  id                String  @id @default(uuid(7))
+  dentistId         String  @unique @map("dentist_id")
+  dentist           Dentist @relation(fields: [dentistId], references: [id], onDelete: Cascade)
+  jciCertificate    String? @map("jci_certificate") @db.VarChar(255)
+  walkthroughVideo  String? @map("walkthrough_video") @db.VarChar(255)
+  signerName        String? @map("signer_name") @db.VarChar(255)
+  signature         String? @map("signature") @db.VarChar(255)
+  agreedToGuarantee Boolean @default(false) @map("agreed_to_guarantee")
+
+  isVerified              Boolean            @default(false) @map("is_verified")
+  verifiedAt              DateTime?          @map("verified_at") @db.Timestamp(6)
+  verifiedBy              LicenseVerifiedBy? @default(PLATFORM) @map("verified_by")
+  verificationNote        String?            @map("verification_note") @db.VarChar(255)
+  verificationRequestNote String?            @map("verification_request_note") @db.VarChar(255)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  @@index([dentistId])
+  @@map("dentist_operations_verification")
+}
+
+model DentistClinicDepthVerification {
+  id            String  @id @default(uuid(7))
+  dentistId     String  @unique @map("dentist_id")
+  dentist       Dentist @relation(fields: [dentistId], references: [id], onDelete: Cascade)
+  clinicAddress String? @map("clinic_address") @db.VarChar(500)
+
+  isVerified              Boolean            @default(false) @map("is_verified")
+  verifiedAt              DateTime?          @map("verified_at") @db.Timestamp(6)
+  verifiedBy              LicenseVerifiedBy? @default(PLATFORM) @map("verified_by")
+  verificationNote        String?            @map("verification_note") @db.VarChar(255)
+  verificationRequestNote String?            @map("verification_request_note") @db.VarChar(255)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  procedureDocs DentistClinicalProcedureDoc[]
+
+  @@index([dentistId])
+  @@map("dentist_clinic_depth_verification")
+}
+
+model DentistClinicalProcedureDoc {
+  id                        String                         @id @default(uuid(7))
+  clinicDepthVerificationId String                         @map("clinic_depth_verification_id")
+  clinicDepthVerification   DentistClinicDepthVerification @relation(fields: [clinicDepthVerificationId], references: [id], onDelete: Cascade)
+  dentistProcedureId        String                         @map("dentist_procedure_id")
+  dentistProcedure          DentistProcedure               @relation(fields: [dentistProcedureId], references: [id], onDelete: Cascade)
+  ceCertificate             String?                        @map("ce_certificate") @db.VarChar(255)
+  materialBrands            String?                        @map("material_brands") @db.VarChar(255)
+  invoice                   String?                        @map("invoice") @db.VarChar(255)
+  protocolPdf               String?                        @map("protocol_pdf") @db.VarChar(255)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  @@index([clinicDepthVerificationId])
+  @@index([dentistProcedureId])
+  @@map("dentist_clinical_procedure_doc")
+}
+
+model DentistVerificationProgress {
+  id        String  @id @default(uuid(7))
+  dentistId String  @unique @map("dentist_id")
+  dentist   Dentist @relation(fields: [dentistId], references: [id], onDelete: Cascade)
+
+  currentPhase          DentistVerificationPhase @default(LICENSE) @map("current_phase")
+  nextPhase             DentistVerificationPhase @default(OPERATIONS) @map("next_phase")
+  rvdScore              Float?                   @default(0) @map("rvd_score")
+  isLicenseVerified     Boolean                  @default(false) @map("is_license_verification")
+  isOperationsVerified  Boolean                  @default(false) @map("is_operations_verification")
+  isClinicDepthVerified Boolean                  @default(false) @map("is_clinic_depth_verification")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  @@index([dentistId])
+  @@map("dentist_verification_progress")
+}

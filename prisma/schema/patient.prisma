@@ -1,58 +1,33 @@
 model Patient {
-    id            String   @id @default(uuid(7))
-    first_name    String   @db.VarChar(255)
-    last_name     String   @db.VarChar(255)
-    gender        String   @db.VarChar(10)
-    phone_number  String   @db.VarChar(25)
-    Country       String   @db.VarChar(100)
-    date_of_birth DateTime @db.Date
+  id          String    @id @default(uuid(7))
+  userId      String    @unique @map("user_id")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phoneNumber String?   @map("phone_number") @db.VarChar(25)
+  country     String?   @map("country") @db.VarChar(100)
+  dateOfBirth DateTime? @map("date_of_birth") @db.Date
 
-    created_at          DateTime             @default(now()) @db.Timestamp(6)
-    updated_at          DateTime             @updatedAt @db.Timestamp(6)
-    personalizationData PersonalizationData?
+  createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt           DateTime             @updatedAt @map("updated_at") @db.Timestamp(6)
+  personalizationData PersonalizationData?
+  treatmentPlans      TreatmentPlan[]
+
+  @@index([userId])
+  @@map("patient")
 }
 
 model PersonalizationData {
-    id                   String              @id @default(uuid(7))
-    patient_id           String              @unique
-    patient              Patient             @relation(fields: [patient_id], references: [id], onDelete: Cascade)
-    procedure_id         String              @map("procedure_id")
-    procedure            Procedure           @relation(fields: [procedure_id], references: [id], onDelete: Cascade)
-    createdAt            DateTime            @default(now()) @map("created_at")
-    updatedAt            DateTime            @updatedAt @map("updated_at")
-    treatmentProcedure   TreatmentProcedure? @relation(fields: [treatmentProcedureId], references: [id])
-    treatmentProcedureId String?
+  id                String          @id @default(uuid(7))
+  patientId         String          @unique @map("patient_id")
+  patient           Patient         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  globalProcedureId String          @map("global_procedure_id")
+  globalProcedure   GlobalProcedure @relation(fields: [globalProcedureId], references: [id], onDelete: Cascade)
+  budget            Decimal?        @db.Decimal(10, 2)
+  travelStartDate   DateTime?       @map("travel_start_date") @db.Date
+  travelEndDate     DateTime?       @map("travel_end_date") @db.Date
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamp(6)
 
-    @@map("personalization_data")
-}
-
-model Procedure {
-    id                   String                @id @default(uuid(7))
-    user_id              String                @unique
-    user                 User                  @relation(fields: [user_id], references: [id], onDelete: Cascade)
-    name                 String                @db.VarChar(255)
-    price                Decimal               @db.Decimal(10, 2)
-    notes                String                @db.Text
-    isDeleted            Boolean               @default(false)
-    deletedAt            DateTime?             @db.Timestamp(6)
-    createdAt            DateTime              @default(now()) @db.Timestamp(6)
-    updatedAt            DateTime              @updatedAt @db.Timestamp(6)
-    personalizationDatas PersonalizationData[]
-
-    @@map("procedure")
-}
-
-model TreatmentProcedure {
-    id                   String                @id @default(uuid(7))
-    dentist_id           String                @unique
-    name                 String                @db.VarChar(255)
-    price                Decimal               @db.Decimal(10, 2)
-    notes                String                @db.Text
-    isDeleted            Boolean               @default(false)
-    deletedAt            DateTime?             @db.Timestamp(6)
-    createdAt            DateTime              @default(now()) @db.Timestamp(6)
-    updatedAt            DateTime              @updatedAt @db.Timestamp(6)
-    personalizationDatas PersonalizationData[]
-
-    @@map("treatment_procedure")
+  @@index([patientId])
+  @@index([globalProcedureId])
+  @@map("personalization_data")
 }

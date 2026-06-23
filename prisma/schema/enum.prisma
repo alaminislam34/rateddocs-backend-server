@@ -1,0 +1,46 @@
+enum UserRole {
+  ADMIN
+  PATIENT
+  DENTIST
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BLOCKED
+  DELETED
+}
+
+enum TreatmentStatus {
+  DRAFT
+  PROPOSED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum LicenseVerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum LicenseVerifiedBy {
+  ADMIN
+  SUPER_ADMIN
+  AUTHORITY
+  PLATFORM
+}
+
+enum DentistVerificationPhase {
+  LICENSE
+  OPERATIONS
+  CLINIC
+}
