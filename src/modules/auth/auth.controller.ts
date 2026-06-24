@@ -82,19 +82,31 @@ export const registerPatient = catchAsync(async (req: Request, res: Response) =>
   });
 });
 
-/**
- * Verify Patient Email via OTP
- */
 export const verifyEmailOtp = catchAsync(async (req: Request, res: Response) => {
   const { email, otp } = req.body;
 
-  await authService.verifyEmailOtp(email, otp);
+  const result = await authService.verifyEmailOtp(email, otp);
+
+  // Set the session token in the response cookie to log the user in automatically
+  res.cookie('better-auth.session_token', result.token, {
+    path: '/',
+    httpOnly: true,
+    secure: env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    expires: result.expiresAt,
+  });
 
   sendResponse(res, {
     statusCode: 200,
     success: true,
-    message: 'Email verified successfully. Patient profile created. You can now log in.',
-    data: null,
+    message: 'Email verified successfully. You have been logged in automatically.',
+    data: {
+      user: result.user,
+      session: {
+        token: result.token,
+        expiresAt: result.expiresAt,
+      },
+    },
   });
 });
 
@@ -105,7 +117,7 @@ export const initiateGoogleLogin = catchAsync(async (req: Request, res: Response
   const result = await auth.api.signInSocial({
     body: {
       provider: 'google',
-      callbackURL: `${env.FRONTEND_URL}/dashboard`, // Target frontend redirect page
+      callbackURL: `${env.FRONTEND_URL}/dashboard`,
     },
     headers: fromNodeHeaders(req.headers),
   });

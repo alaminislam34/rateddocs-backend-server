@@ -61,9 +61,9 @@ export const auth = betterAuth({
     google: {
       clientId: env.GOOGLE_CLIENT_ID,
       clientSecret: env.GOOGLE_CLIENT_SECRET,
-      redirectURI: 'http://localhost:5000/api/v1/auth/login/callback/google',
     },
   },
   secret: env.BETTER_AUTH_SECRET,
   baseURL: env.BETTER_AUTH_URL,
+  trustedOrigins: ["http://localhost:3000", "http://localhost:5000"]
 });

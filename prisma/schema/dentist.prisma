@@ -27,10 +27,12 @@ model Dentist {
 }
 
 model DentistProfessionalData {
-  id        String  @id @default(cuid())
-  dentistId String  @unique @map("dentist_id")
-  dentist   Dentist @relation(fields: [dentistId], references: [id], onDelete: Cascade)
-  legalName String  @map("legal_name") @db.VarChar(255)
+  id                String  @id @default(cuid())
+  dentistId         String  @unique @map("dentist_id")
+  dentist           Dentist @relation(fields: [dentistId], references: [id], onDelete: Cascade)
+  legalName         String  @map("legal_name") @db.VarChar(255)
+  yearsOfExperience Int?    @map("years_of_experience")
+  city              String  @db.VarChar(100)
 
   @@index([dentistId])
   @@map("dentist_professional_data")

@@ -34,6 +34,7 @@ model DentistProcedure {
 
   clinicalProcedureDocs DentistClinicalProcedureDoc[]
 
+  @@unique([dentistId, globalProcedureId], name: "dentist_procedure_unique")
   @@index([dentistId])
   @@index([globalProcedureId])
   @@map("dentist_procedure")

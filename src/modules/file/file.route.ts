@@ -5,6 +5,6 @@ import { authMiddleware } from '../../middlewares/auth.middleware.js';
 
 const router = Router();
 
-router.post('/upload', authMiddleware, upload.single('file'), fileController.uploadSingleFile);
+router.post('/upload', authMiddleware(), upload.single('file'), fileController.uploadSingleFile);
 
 export const fileRoutes = router;

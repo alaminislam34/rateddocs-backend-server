@@ -2,211 +2,534 @@
   "info": {
     "_postman_id": "8c459f14-34fd-4df9-8cf0-21a47321eb91",
     "name": "RatedDocs Auth Module",
-    "description": "API collection for testing RatedDocs Patient Registration, OTP Email Verification, separate logins, Google OAuth, and Logout endpoints.",
+    "description": "API collection for testing RatedDocs Patient and Dentist Registration, OTP Email Verification, separate logins, Google OAuth, multi-phase Dentist verification steps, and Admin reviews.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
-      "name": "Patient Registration",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json",
-            "type": "text"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"email\": \"patient@example.com\",\n  \"password\": \"securepassword123\",\n  \"confirmPassword\": \"securepassword123\"\n}"
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Patient Registration",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"patient@example.com\",\n  \"password\": \"securepassword123\",\n  \"confirmPassword\": \"securepassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/register/patient",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "register", "patient"]
+            },
+            "description": "Register a new Patient. Sends a 6-digit verification OTP code to the provided email address."
+          },
+          "response": []
         },
-        "url": {
-          "raw": "{{base_url}}/api/v1/auth/register/patient",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "api",
-            "v1",
-            "auth",
-            "register",
-            "patient"
-          ]
+        {
+          "name": "Verify Email OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"patient@example.com\",\n  \"otp\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/verify-email",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "verify-email"]
+            },
+            "description": "Submit the 6-digit OTP code received via email to activate the user account and create their Patient profile."
+          },
+          "response": []
         },
-        "description": "Register a new Patient. Sends a 6-digit verification OTP code to the provided email address."
-      },
-      "response": []
+        {
+          "name": "Patient Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"patient@example.com\",\n  \"password\": \"securepassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login/patient",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "login", "patient"]
+            },
+            "description": "Log in as a Patient. Sets the secure session cookies automatically. If the account is unverified, it automatically triggers a new OTP email and blocks login until verified."
+          },
+          "response": []
+        },
+        {
+          "name": "Dentist Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"dentist@example.com\",\n  \"password\": \"securepassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login/dentist",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "login", "dentist"]
+            },
+            "description": "Log in as a Dentist. Restricts access to users holding the DENTIST role."
+          },
+          "response": []
+        },
+        {
+          "name": "Admin Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"securepassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login/admin",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "login", "admin"]
+            },
+            "description": "Log in as an Admin or Super Admin."
+          },
+          "response": []
+        },
+        {
+          "name": "Initiate Google Login",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login/google",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "login", "google"]
+            },
+            "description": "Initiate Google OAuth login redirect flow. Access directly in browser (e.g. via anchor links) to redirect to Google's consent screen."
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "logout"]
+            },
+            "description": "Invalidates the active session in the database and clears the browser's HTTP-Only session cookie."
+          },
+          "response": []
+        }
+      ]
     },
     {
-      "name": "Verify Email OTP",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json",
-            "type": "text"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"email\": \"patient@example.com\",\n  \"otp\": \"123456\"\n}"
+      "name": "Dentist",
+      "item": [
+        {
+          "name": "Dentist Registration",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "firstName",
+                  "value": "Sarah",
+                  "type": "text"
+                },
+                {
+                  "key": "lastName",
+                  "value": "Rahman",
+                  "type": "text"
+                },
+                {
+                  "key": "email",
+                  "value": "sarah.dentist@rateddocs.com",
+                  "type": "text"
+                },
+                {
+                  "key": "phoneNumber",
+                  "value": "+8801700000000",
+                  "type": "text"
+                },
+                {
+                  "key": "gender",
+                  "value": "FEMALE",
+                  "type": "text"
+                },
+                {
+                  "key": "country",
+                  "value": "Bangladesh",
+                  "type": "text"
+                },
+                {
+                  "key": "referralCode",
+                  "value": "REF123",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "DentistPassword123!",
+                  "type": "text"
+                },
+                {
+                  "key": "confirmPassword",
+                  "value": "DentistPassword123!",
+                  "type": "text"
+                },
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/dentists/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "dentists", "register"]
+            },
+            "description": "Register a new Dentist. Sends a 6-digit verification OTP code to the provided email address. Accepts multipart/form-data with an optional professional headshot file ('image')."
+          },
+          "response": []
         },
-        "url": {
-          "raw": "{{base_url}}/api/v1/auth/verify-email",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "api",
-            "v1",
-            "auth",
-            "verify-email"
-          ]
+        {
+          "name": "Submit Professional Data",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"legalName\": \"Dr. Sarah Rahman, DDS\",\n  \"yearsOfExperience\": 8,\n  \"primarySpecialty\": \"Orthodontics\",\n  \"country\": \"Bangladesh\",\n  \"city\": \"Dhaka\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/dentists/professional-data",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "dentists", "professional-data"]
+            },
+            "description": "Submit dentist's professional background and primary specialty details."
+          },
+          "response": []
         },
-        "description": "Submit the 6-digit OTP code received via email to activate the user account and create their Patient profile."
-      },
-      "response": []
+        {
+          "name": "Check Registry (Simulation)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"country\": \"Bangladesh\",\n  \"city\": \"Dhaka\",\n  \"registrationAuthority\": \"BMDC\",\n  \"registrationNumber\": \"DENT-887122\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/dentists/verify-license/check",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "dentists", "verify-license", "check"]
+            },
+            "description": "Check dentist registration registry. Simulates a mismatch to enforce manual document upload."
+          },
+          "response": []
+        },
+        {
+          "name": "Submit License Document",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "country",
+                  "value": "Bangladesh",
+                  "type": "text"
+                },
+                {
+                  "key": "city",
+                  "value": "Dhaka",
+                  "type": "text"
+                },
+                {
+                  "key": "registrationAuthority",
+                  "value": "BMDC",
+                  "type": "text"
+                },
+                {
+                  "key": "registrationNumber",
+                  "value": "DENT-887122",
+                  "type": "text"
+                },
+                {
+                  "key": "licenseDocument",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "profilePicture",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/dentists/verify-license/submit",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "dentists", "verify-license", "submit"]
+            },
+            "description": "Upload/submit physical license certificate document and professional profile picture for manual verification. Accepts multipart/form-data with fields 'licenseDocument' (file) and 'profilePicture' (file)."
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Operations Details",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "signerName",
+                  "value": "Sarah Rahman",
+                  "type": "text"
+                },
+                {
+                  "key": "signature",
+                  "value": "SarahR",
+                  "type": "text"
+                },
+                {
+                  "key": "agreedToGuarantee",
+                  "value": "true",
+                  "type": "text"
+                },
+                {
+                  "key": "procedures",
+                  "value": "[{\"procedureName\":\"Teeth Whitening\",\"price\":250,\"notes\":\"Premium whitening session\"},{\"procedureName\":\"Root Canal Treatment\",\"price\":500}]",
+                  "type": "text"
+                },
+                {
+                  "key": "jciCertificate",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "walkthroughVideo",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "csvFile",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/dentists/verify-operations/submit",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "dentists", "verify-operations", "submit"]
+            },
+            "description": "Submit clinic operations checklists, sign medical guarantees, add custom procedures or upload a CSV. Accepts multipart/form-data with file fields 'jciCertificate', 'walkthroughVideo', 'csvFile'."
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Clinic Depth Docs",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clinicAddress\": \"Road 11, Banani, Dhaka, Bangladesh\",\n  \"procedureDocs\": [\n    {\n      \"dentistProcedureId\": \"teeth-whitening\",\n      \"ceCertificate\": \"https://res.cloudinary.com/rateddocs/docs/ce-teeth.pdf\",\n      \"materialBrands\": \"Opalescence Go\",\n      \"invoice\": \"https://res.cloudinary.com/rateddocs/docs/invoice-teeth.pdf\",\n      \"protocolPdf\": \"https://res.cloudinary.com/rateddocs/docs/protocol-teeth.pdf\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/dentists/verify-clinic-depth/submit",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "dentists", "verify-clinic-depth", "submit"]
+            },
+            "description": "Submit clinic location maps and verification documents (CE, Material brand invoice, protocol) for selected dentist procedures."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Verification Progress",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/dentists/progress",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "dentists", "progress"]
+            },
+            "description": "Retrieve current dynamic dentist verification phase and RVD progress score."
+          },
+          "response": []
+        }
+      ]
     },
     {
-      "name": "Patient Login",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json",
-            "type": "text"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"email\": \"patient@example.com\",\n  \"password\": \"securepassword123\"\n}"
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Admin: Get Verifications List",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/dentists/admin/verifications?status=PENDING&search=Sarah&page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "dentists", "admin", "verifications"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "PENDING"
+                },
+                {
+                  "key": "search",
+                  "value": "Sarah"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Retrieve all dentist profiles and verification documents with status filter, keyword search, and pagination."
+          },
+          "response": []
         },
-        "url": {
-          "raw": "{{base_url}}/api/v1/auth/login/patient",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "api",
-            "v1",
-            "auth",
-            "login",
-            "patient"
-          ]
+        {
+          "name": "Admin: Verify License",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isApproved\": true,\n  \"note\": \"License certificate is authentic and registered.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/dentists/admin/verify-license/DENTIST_ID",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "dentists", "admin", "verify-license", "DENTIST_ID"]
+            },
+            "description": "Review and verify/reject dentist's license manually (adds 30% to RVD). If rejecting (isApproved = false), a note containing the rejection reason must be supplied."
+          },
+          "response": []
         },
-        "description": "Log in as a Patient. Sets the secure session cookies automatically. If the account is unverified, it automatically triggers a new OTP email and blocks login until verified."
-      },
-      "response": []
-    },
-    {
-      "name": "Dentist Login",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json",
-            "type": "text"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"email\": \"dentist@example.com\",\n  \"password\": \"securepassword123\"\n}"
+        {
+          "name": "Admin: Verify Operations",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isApproved\": true,\n  \"note\": \"JCI certificate and guarantee details verified.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/dentists/admin/verify-operations/DENTIST_ID",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "dentists", "admin", "verify-operations", "DENTIST_ID"]
+            },
+            "description": "Review and verify/reject dentist's operations check (adds 40% to RVD). If rejecting (isApproved = false), a note containing the rejection reason must be supplied."
+          },
+          "response": []
         },
-        "url": {
-          "raw": "{{base_url}}/api/v1/auth/login/dentist",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "api",
-            "v1",
-            "auth",
-            "login",
-            "dentist"
-          ]
-        },
-        "description": "Log in as a Dentist. Restricts access to users holding the DENTIST role."
-      },
-      "response": []
-    },
-    {
-      "name": "Admin Login",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json",
-            "type": "text"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"securepassword123\"\n}"
-        },
-        "url": {
-          "raw": "{{base_url}}/api/v1/auth/login/admin",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "api",
-            "v1",
-            "auth",
-            "login",
-            "admin"
-          ]
-        },
-        "description": "Log in as an Admin or Super Admin."
-      },
-      "response": []
-    },
-    {
-      "name": "Initiate Google Login",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{base_url}}/api/v1/auth/login/google",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "api",
-            "v1",
-            "auth",
-            "login",
-            "google"
-          ]
-        },
-        "description": "Initiate Google OAuth login redirect flow. Access directly in browser (e.g. via anchor links) to redirect to Google's consent screen."
-      },
-      "response": []
-    },
-    {
-      "name": "Logout",
-      "request": {
-        "method": "POST",
-        "header": [],
-        "url": {
-          "raw": "{{base_url}}/api/v1/auth/logout",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "api",
-            "v1",
-            "auth",
-            "logout"
-          ]
-        },
-        "description": "Invalidates the active session in the database and clears the browser's HTTP-Only session cookie."
-      },
-      "response": []
+        {
+          "name": "Admin: Verify Clinic Depth",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isApproved\": true,\n  \"note\": \"Clinical protocols and CE certificates validated.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/dentists/admin/verify-clinic-depth/DENTIST_ID",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "dentists", "admin", "verify-clinic-depth", "DENTIST_ID"]
+            },
+            "description": "Review and verify/reject dentist's clinic depth procedures and certificates (adds 30% to RVD). If rejecting (isApproved = false), a note containing the rejection reason must be supplied."
+          },
+          "response": []
+        }
+      ]
     }
   ],
   "event": [
@@ -214,18 +537,14 @@
       "listen": "prerequest",
       "script": {
         "type": "text/javascript",
-        "exec": [
-          ""
-        ]
+        "exec": [""]
       }
     },
     {
       "listen": "test",
       "script": {
         "type": "text/javascript",
-        "exec": [
-          ""
-        ]
+        "exec": [""]
       }
     }
   ],

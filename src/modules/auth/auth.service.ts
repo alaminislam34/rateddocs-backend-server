@@ -9,7 +9,7 @@ import { env } from '../../config/env.js';
 /**
  * Generates a 6-digit verification OTP, persists it, and sends it to the user's email.
  */
-const generateAndSendOTP = async (email: string, name: string) => {
+export const generateAndSendOTP = async (email: string, name: string) => {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
@@ -154,7 +154,7 @@ export const verifyEmailOtp = async (email: string, otp: string) => {
       },
     });
 
-    if (!user.patient) {
+    if (user.role === 'PATIENT' && !user.patient) {
       await tx.patient.create({
         data: {
           userId: user.id,
@@ -174,4 +174,31 @@ export const verifyEmailOtp = async (email: string, otp: string) => {
     name,
     dashboardUrl: `${env.FRONTEND_URL}/dashboard`,
   });
+
+  // Create active session in Better-Auth
+  const authCtx = await (auth as {
+    $context: Promise<{
+      internalAdapter: {
+        createSession: (
+          userId: string,
+          dontRememberMe?: boolean,
+          override?: Record<string, unknown>,
+          overrideAll?: boolean
+        ) => Promise<{ token: string; expiresAt: Date }>;
+      };
+    }>;
+  }).$context;
+
+  const session = await authCtx.internalAdapter.createSession(user.id);
+
+  return {
+    token: session.token as string,
+    expiresAt: session.expiresAt as Date,
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+    },
+  };
 };
