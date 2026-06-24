@@ -24,6 +24,9 @@ const envSchema = z.object({
   SMTP_USER: z.string({ message: 'SMTP_USER is required' }),
   SMTP_PASS: z.string({ message: 'SMTP_PASS is required' }),
   SMTP_FROM: z.string().default('RatedDocs <noreply@rateddocs.com>'),
+  FRONTEND_URL: z.string().default('http://localhost:3000'),
+  GOOGLE_CLIENT_ID: z.string({ message: 'GOOGLE_CLIENT_ID is required' }),
+  GOOGLE_CLIENT_SECRET: z.string({ message: 'GOOGLE_CLIENT_SECRET is required' }),
 });
 
 const parsed = envSchema.safeParse(process.env);

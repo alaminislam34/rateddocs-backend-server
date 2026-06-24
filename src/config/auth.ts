@@ -3,42 +3,17 @@ import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { prisma } from './db.js';
 import { env } from './env.js';
 import { sendEmail } from '../utils/sendEmail.js';
-
-interface EmailCallbackUser {
-  id: string;
-  email: string;
-  name: string;
-  image?: string | null;
-  firstName?: string | null;
-  lastName?: string | null;
-}
-
-interface EmailCallbackData {
-  user: EmailCallbackUser;
-  url: string;
-  token: string;
-}
+import { EmailCallbackData } from '../modules/auth/auth.interface.js';
+import { UserRole, UserStatus } from '../generated/prisma/index.js';
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: 'postgresql',
   }),
+
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
-    sendVerificationEmail: async (data: EmailCallbackData) => {
-      const { user, url } = data;
-      const name = user.firstName || user.name || 'there';
-      await sendEmail(
-        user.email,
-        'Verify your RatedDocs email address',
-        'verify-email',
-        {
-          name,
-          verificationUrl: url,
-        }
-      );
-    },
     sendResetPassword: async (data: EmailCallbackData) => {
       const { user, url } = data;
       const name = user.firstName || user.name || 'there';
@@ -53,15 +28,40 @@ export const auth = betterAuth({
       );
     },
   },
+
+  emailVerification: {
+    sendOnSignUp: true,
+    sendVerificationEmail: async (data: EmailCallbackData) => {
+      const { user, url } = data;
+      const name = user.firstName || user.name || 'there';
+      await sendEmail(
+        user.email,
+        'Verify your RatedDocs email address',
+        'verify-email',
+        {
+          name,
+          verificationUrl: url,
+        }
+      );
+    },
+  },
+
   user: {
     additionalFields: {
       firstName: { type: 'string', required: false },
       lastName: { type: 'string', required: false },
-      role: { type: 'string', required: false, defaultValue: 'PATIENT' },
-      status: { type: 'string', required: false, defaultValue: 'ACTIVE' },
+      role: { type: 'string', required: false, defaultValue: UserRole.PATIENT },
+      status: { type: 'string', required: false, defaultValue: UserStatus.ACTIVE },
       gender: { type: 'string', required: false },
       isDeleted: { type: 'boolean', required: false, defaultValue: false },
       deletedAt: { type: 'date', required: false },
+    },
+  },
+  socialProviders: {
+    google: {
+      clientId: env.GOOGLE_CLIENT_ID,
+      clientSecret: env.GOOGLE_CLIENT_SECRET,
+      redirectURI: 'http://localhost:5000/api/v1/auth/login/callback/google',
     },
   },
   secret: env.BETTER_AUTH_SECRET,
