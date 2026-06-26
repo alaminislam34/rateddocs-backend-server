@@ -7,11 +7,11 @@ import { toNodeHandler } from 'better-auth/node';
 import path from 'path';
 
 import { auth } from './config/auth.js';
-import { env } from './config/env.js';
+import { envVars } from './config/env.js';
 import { indexRoutes } from './routes/index.js';
 import { notFound } from './middlewares/notFound.js';
 import { globalErrorHandler } from './errors/globalErrorHandler.js';
-import { sendResponse } from './utils/sendResponse.js';
+import { sendResponse } from './shared/sendResponse.js';
 import { prisma } from './config/db.js';
 import { redisClient } from './config/redis.js';
 import { transporter } from './config/mail.js';
@@ -25,20 +25,22 @@ app.set('views', path.join(process.cwd(), 'src/views'));
 // 1. Global Pre-middleware (Security & Logging, except body parsing)
 app.use(
   cors({
-    origin: env.NODE_ENV === 'production' ? false : true,
+    origin: envVars.NODE_ENV === 'production' ? false : true,
     credentials: true,
-  })
+  }),
 );
 app.use(
   helmet({
     contentSecurityPolicy: false, // Disabled to allow rendering of online assets/fonts in local dashboard
-  })
+  }),
 );
-app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
-app.use(cookieParser());
 
-// 2. Mount Better Auth (MUST be before body parsing)
-app.all('/api/auth/{*splat}', toNodeHandler(auth));
+// 1.2 Mount Better Auth (MUST be before body parsing)
+app.all('/api/auth/{*path}', toNodeHandler(auth));
+
+// 2. Body Parsing Middleware (Safe for standard routes)
+app.use(morgan(envVars.NODE_ENV === 'production' ? 'combined' : 'dev'));
+app.use(cookieParser());
 
 // 3. Body Parsing Middleware (Safe for standard routes)
 app.use(express.json());
@@ -82,7 +84,7 @@ app.get('/api/health-check', async (req, res) => {
   // Render HTML dashboard for browser requests
   if (req.headers.accept && req.headers.accept.includes('text/html')) {
     return res.render('dashboard', {
-      env: env.NODE_ENV,
+      env: envVars.NODE_ENV,
       dbConnected,
       redisConnected,
       mailConnected,
@@ -98,7 +100,7 @@ app.get('/api/health-check', async (req, res) => {
     message: 'RatedDocs backend system is running smoothly',
     data: {
       timestamp: new Date(),
-      env: env.NODE_ENV,
+      env: envVars.NODE_ENV,
       dbConnected,
       redisConnected,
       mailConnected,

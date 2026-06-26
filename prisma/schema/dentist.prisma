@@ -172,3 +172,14 @@ model DentistVerificationProgress {
   @@index([dentistId])
   @@map("dentist_verification_progress")
 }
+
+model VerificationWeight {
+  id                    String   @id @default(cuid())
+  licenseWeight         Float    @default(30) @map("license_weight")
+  operationsWeight      Float    @default(40) @map("operations_weight")
+  clinicDepthWeight     Float    @default(30) @map("clinic_depth_weight")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@map("verification_weights")
+}

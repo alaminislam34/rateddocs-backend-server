@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
-import { catchAsync } from '../../utils/catchAsync.js';
-import { sendResponse } from '../../utils/sendResponse.js';
-import { uploadToCloudinary } from '../../utils/fileUpload.js';
+import { catchAsync } from '../../shared/catchAsync.js';
+import { sendResponse } from '../../shared/sendResponse.js';
+import { uploadToCloudinary } from '../../shared/fileUpload.js';
 import { AppError } from '../../errors/AppError.js';
 
 export const uploadSingleFile = catchAsync(async (req: Request, res: Response) => {

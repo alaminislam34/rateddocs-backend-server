@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "8c459f14-34fd-4df9-8cf0-21a47321eb91",
     "name": "RatedDocs Auth Module",
-    "description": "API collection for testing RatedDocs Patient and Dentist Registration, OTP Email Verification, separate logins, Google OAuth, multi-phase Dentist verification steps, and Admin reviews.",
+    "description": "API collection for testing RatedDocs Patient and Dentist Registration, OTP Email Verification, separate logins, Google OAuth, multi-phase Dentist verification steps, Admin reviews, dynamic RVD weight management, and Dentist Procedure management.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -58,7 +58,7 @@
           "response": []
         },
         {
-          "name": "Patient Login",
+          "name": "User Login",
           "request": {
             "method": "POST",
             "header": [
@@ -73,16 +73,16 @@
               "raw": "{\n  \"email\": \"patient@example.com\",\n  \"password\": \"securepassword123\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/v1/auth/login/patient",
+              "raw": "{{base_url}}/api/v1/auth/login",
               "host": ["{{base_url}}"],
-              "path": ["api", "v1", "auth", "login", "patient"]
+              "path": ["api", "v1", "auth", "login"]
             },
-            "description": "Log in as a Patient. Sets the secure session cookies automatically. If the account is unverified, it automatically triggers a new OTP email and blocks login until verified."
+            "description": "Log in as a Patient or Dentist. Sets the secure session cookies automatically. If the account is unverified, it automatically triggers a new OTP email and blocks login until verified. If 2FA is active, returns verification required."
           },
           "response": []
         },
         {
-          "name": "Dentist Login",
+          "name": "Verify 2FA OTP",
           "request": {
             "method": "POST",
             "header": [
@@ -94,14 +94,38 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"dentist@example.com\",\n  \"password\": \"securepassword123\"\n}"
+              "raw": "{\n  \"email\": \"patient@example.com\",\n  \"otp\": \"123456\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/v1/auth/login/dentist",
+              "raw": "{{base_url}}/api/v1/auth/verify-2fa",
               "host": ["{{base_url}}"],
-              "path": ["api", "v1", "auth", "login", "dentist"]
+              "path": ["api", "v1", "auth", "verify-2fa"]
             },
-            "description": "Log in as a Dentist. Restricts access to users holding the DENTIST role."
+            "description": "Verify the 6-digit OTP code sent via email during the 2FA login flow to establish a session."
+          },
+          "response": []
+        },
+        {
+          "name": "Resend OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"patient@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/resend-otp",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "resend-otp"]
+            },
+            "description": "Resend the email verification or 2FA login OTP code to the user's registered email address."
           },
           "response": []
         },
@@ -125,7 +149,7 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "login", "admin"]
             },
-            "description": "Log in as an Admin or Super Admin."
+            "description": "Log in as an Admin or Super Admin. Prevents normal dentists/patients from logging in here."
           },
           "response": []
         },
@@ -139,7 +163,21 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "login", "google"]
             },
-            "description": "Initiate Google OAuth login redirect flow. Access directly in browser (e.g. via anchor links) to redirect to Google's consent screen."
+            "description": "Initiate Google OAuth login redirect flow. Access directly in browser to redirect to Google consent screen."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Session",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/session",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "session"]
+            },
+            "description": "Retrieves the active session and user profile. Validates the request against session hijacking by matching the User-Agent and Class C subnet IP."
           },
           "response": []
         },
@@ -153,7 +191,36 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "logout"]
             },
-            "description": "Invalidates the active session in the database and clears the browser's HTTP-Only session cookie."
+            "description": "Invalidates the active session in the database and clears the browser session cookies."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Patient",
+      "item": [
+        {
+          "name": "Submit Personalization Data",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"gender\": \"MALE\",\n  \"country\": \"USA\",\n  \"city\": \"New York\",\n  \"insuranceProvider\": \"Aetna\",\n  \"preferredLanguage\": \"English\",\n  \"treatmentGoals\": [\"Teeth Whitening\", \"Cleaning\"],\n  \"isAnxious\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/patients/personalize-data",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "patients", "personalize-data"]
+            },
+            "description": "Submit personalization preferences and information for the patient profile."
           },
           "response": []
         }
@@ -227,7 +294,7 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "dentists", "register"]
             },
-            "description": "Register a new Dentist. Sends a 6-digit verification OTP code to the provided email address. Accepts multipart/form-data with an optional professional headshot file ('image')."
+            "description": "Register a new Dentist. Sends verification OTP to the email address. Accepts multipart/form-data with optional professional headshot."
           },
           "response": []
         },
@@ -275,7 +342,7 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "dentists", "verify-license", "check"]
             },
-            "description": "Check dentist registration registry. Simulates a mismatch to enforce manual document upload."
+            "description": "Check dentist registry database. Simulates a registry verification."
           },
           "response": []
         },
@@ -324,7 +391,7 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "dentists", "verify-license", "submit"]
             },
-            "description": "Upload/submit physical license certificate document and professional profile picture for manual verification. Accepts multipart/form-data with fields 'licenseDocument' (file) and 'profilePicture' (file)."
+            "description": "Upload physical license certificate document and professional profile picture for manual verification. Accepts multipart/form-data with 'licenseDocument' and 'profilePicture' file fields."
           },
           "response": []
         },
@@ -378,7 +445,7 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "dentists", "verify-operations", "submit"]
             },
-            "description": "Submit clinic operations checklists, sign medical guarantees, add custom procedures or upload a CSV. Accepts multipart/form-data with file fields 'jciCertificate', 'walkthroughVideo', 'csvFile'."
+            "description": "Submit clinic operations checklists, sign medical guarantees, add custom procedures or upload a CSV."
           },
           "response": []
         },
@@ -423,6 +490,107 @@
       ]
     },
     {
+      "name": "Procedures",
+      "item": [
+        {
+          "name": "Get Global Procedures",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/procedures/global?search=whitening",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "procedures", "global"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "whitening"
+                }
+              ]
+            },
+            "description": "Retrieve global procedures list with search keyword."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Dentist Procedures",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/procedures/dentist",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "procedures", "dentist"]
+            },
+            "description": "Retrieve procedures listed on the dentist's own profile."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Dentist Procedure",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"procedureName\": \"Teeth Cleaning\",\n  \"price\": 120,\n  \"notes\": \"Regular cleaning and scaling session\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/procedures/dentist",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "procedures", "dentist"]
+            },
+            "description": "Create a new procedure connection for the logged-in dentist."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Dentist Procedure",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/procedures/dentist/DENTIST_PROCEDURE_ID",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "procedures", "dentist", "DENTIST_PROCEDURE_ID"]
+            },
+            "description": "Delete/remove a registered procedure from the dentist's profile."
+          },
+          "response": []
+        },
+        {
+          "name": "Bulk Upload Procedures (CSV)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "csvFile",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/procedures/dentist/csv",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "procedures", "dentist", "csv"]
+            },
+            "description": "Bulk import procedures using CSV upload. Requires a multipart/form-data field 'csvFile'."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Admin",
       "item": [
         {
@@ -431,9 +599,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/v1/dentists/admin/verifications?status=PENDING&search=Sarah&page=1&limit=10",
+              "raw": "{{base_url}}/api/v1/admin/verifications?status=PENDING&search=Sarah&page=1&limit=10",
               "host": ["{{base_url}}"],
-              "path": ["api", "v1", "dentists", "admin", "verifications"],
+              "path": ["api", "v1", "admin", "verifications"],
               "query": [
                 {
                   "key": "status",
@@ -473,11 +641,11 @@
               "raw": "{\n  \"isApproved\": true,\n  \"note\": \"License certificate is authentic and registered.\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/v1/dentists/admin/verify-license/DENTIST_ID",
+              "raw": "{{base_url}}/api/v1/admin/verify-license/DENTIST_ID",
               "host": ["{{base_url}}"],
-              "path": ["api", "v1", "dentists", "admin", "verify-license", "DENTIST_ID"]
+              "path": ["api", "v1", "admin", "verify-license", "DENTIST_ID"]
             },
-            "description": "Review and verify/reject dentist's license manually (adds 30% to RVD). If rejecting (isApproved = false), a note containing the rejection reason must be supplied."
+            "description": "Review and verify/reject dentist's license manually. Automatically recalculates dentist's RVD score using current weights."
           },
           "response": []
         },
@@ -497,11 +665,11 @@
               "raw": "{\n  \"isApproved\": true,\n  \"note\": \"JCI certificate and guarantee details verified.\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/v1/dentists/admin/verify-operations/DENTIST_ID",
+              "raw": "{{base_url}}/api/v1/admin/verify-operations/DENTIST_ID",
               "host": ["{{base_url}}"],
-              "path": ["api", "v1", "dentists", "admin", "verify-operations", "DENTIST_ID"]
+              "path": ["api", "v1", "admin", "verify-operations", "DENTIST_ID"]
             },
-            "description": "Review and verify/reject dentist's operations check (adds 40% to RVD). If rejecting (isApproved = false), a note containing the rejection reason must be supplied."
+            "description": "Review and verify/reject dentist's operations check. Automatically recalculates dentist's RVD score using current weights."
           },
           "response": []
         },
@@ -521,11 +689,136 @@
               "raw": "{\n  \"isApproved\": true,\n  \"note\": \"Clinical protocols and CE certificates validated.\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/v1/dentists/admin/verify-clinic-depth/DENTIST_ID",
+              "raw": "{{base_url}}/api/v1/admin/verify-clinic-depth/DENTIST_ID",
               "host": ["{{base_url}}"],
-              "path": ["api", "v1", "dentists", "admin", "verify-clinic-depth", "DENTIST_ID"]
+              "path": ["api", "v1", "admin", "verify-clinic-depth", "DENTIST_ID"]
             },
-            "description": "Review and verify/reject dentist's clinic depth procedures and certificates (adds 30% to RVD). If rejecting (isApproved = false), a note containing the rejection reason must be supplied."
+            "description": "Review and verify/reject dentist's clinic depth procedures and certificates. Automatically recalculates dentist's RVD score using current weights."
+          },
+          "response": []
+        },
+        {
+          "name": "Admin: Get Verification Weights",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/verification-weights",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "admin", "verification-weights"]
+            },
+            "description": "Retrieve current dynamic verification step weight settings (default is 30/40/30)."
+          },
+          "response": []
+        },
+        {
+          "name": "Admin: Update Verification Weights",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"licenseWeight\": 35,\n  \"operationsWeight\": 35,\n  \"clinicDepthWeight\": 30\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/verification-weights",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "admin", "verification-weights"]
+            },
+            "description": "Update system verification weights dynamically. Total weights must sum to exactly 100. Triggers automatic recalculation of RVD scores for all dentists."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Specialties",
+      "item": [
+        {
+          "name": "Get Specialties",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/specialties?search=ortho",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "specialties"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "ortho"
+                }
+              ]
+            },
+            "description": "Retrieve list of all active specialties with optional name/slug query search."
+          },
+          "response": []
+        },
+        {
+          "name": "Admin: Create Specialty",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Orthodontics\",\n  \"description\": \"Focuses on diagnosing, preventing, and correcting mispositioned teeth and jaws.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/specialties",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "specialties"]
+            },
+            "description": "Create a new dentist specialty category. Restricted to Admins & Super Admins."
+          },
+          "response": []
+        },
+        {
+          "name": "Admin: Update Specialty",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Orthodontics & Dentofacial Orthopedics\",\n  \"description\": \"Updated description text\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/specialties/SPECIALTY_ID",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "specialties", "SPECIALTY_ID"]
+            },
+            "description": "Modify an existing specialty's details and regenerates its slug. Restricted to Admins & Super Admins."
+          },
+          "response": []
+        },
+        {
+          "name": "Admin: Delete Specialty",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/specialties/SPECIALTY_ID",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "specialties", "SPECIALTY_ID"]
+            },
+            "description": "Remove a specialty. Fails with a 409 Conflict if any dentist or global procedure is currently associated with it."
           },
           "response": []
         }

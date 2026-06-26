@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import * as dentistController from './dentist.controller.js';
+import { DentistController } from './dentist.controller.js';
 import { validateRequest } from '../../middlewares/validateRequest.js';
 import { authMiddleware } from '../../middlewares/auth.middleware.js';
 import { UserRole } from '../../generated/prisma/index.js';
-import { upload } from '../../utils/fileUpload.js';
+import { upload } from '../../shared/fileUpload.js';
 import {
   registerDentistSchema,
   submitProfessionalDataSchema,
@@ -20,7 +20,7 @@ router.post(
   '/register',
   upload.single('image'),
   validateRequest(registerDentistSchema),
-  dentistController.registerDentist
+  DentistController.registerDentist,
 );
 
 // Dentist Protected Routes
@@ -28,14 +28,14 @@ router.post(
   '/professional-data',
   authMiddleware(UserRole.DENTIST),
   validateRequest(submitProfessionalDataSchema),
-  dentistController.submitProfessionalData
+  DentistController.submitProfessionalData,
 );
 
 router.post(
   '/verify-license/check',
   authMiddleware(UserRole.DENTIST),
   validateRequest(checkLicenseSchema),
-  dentistController.checkLicenseRegistry
+  DentistController.checkLicenseRegistry,
 );
 
 router.post(
@@ -46,7 +46,7 @@ router.post(
     { name: 'profilePicture', maxCount: 1 },
   ]),
   validateRequest(submitLicenseSchema),
-  dentistController.submitLicense
+  DentistController.submitLicense,
 );
 
 router.post(
@@ -58,45 +58,20 @@ router.post(
     { name: 'csvFile', maxCount: 1 },
   ]),
   validateRequest(submitOperationsSchema),
-  dentistController.submitOperations
+  DentistController.submitOperations,
 );
 
 router.post(
   '/verify-clinic-depth/submit',
   authMiddleware(UserRole.DENTIST),
   validateRequest(submitClinicDepthSchema),
-  dentistController.submitClinicDepth
+  DentistController.submitClinicDepth,
 );
 
 router.get(
   '/progress',
   authMiddleware(UserRole.DENTIST),
-  dentistController.getVerificationProgress
-);
-
-// Admin/Super Admin Verification Controls
-router.get(
-  '/admin/verifications',
-  authMiddleware(UserRole.ADMIN, UserRole.SUPER_ADMIN),
-  dentistController.getVerificationsListAdmin
-);
-
-router.patch(
-  '/admin/verify-license/:dentistId',
-  authMiddleware(UserRole.ADMIN, UserRole.SUPER_ADMIN),
-  dentistController.verifyLicenseAdmin
-);
-
-router.patch(
-  '/admin/verify-operations/:dentistId',
-  authMiddleware(UserRole.ADMIN, UserRole.SUPER_ADMIN),
-  dentistController.verifyOperationsAdmin
-);
-
-router.patch(
-  '/admin/verify-clinic-depth/:dentistId',
-  authMiddleware(UserRole.ADMIN, UserRole.SUPER_ADMIN),
-  dentistController.verifyClinicDepthAdmin
+  DentistController.getVerificationProgress,
 );
 
 export const dentistRoutes = router;

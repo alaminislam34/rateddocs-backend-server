@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { catchAsync } from '../utils/catchAsync.js';
+import { catchAsync } from '../shared/catchAsync.js';
 
 export const validateRequest = <T extends z.ZodTypeAny>(schema: T) => {
   return catchAsync(async (req, res, next) => {

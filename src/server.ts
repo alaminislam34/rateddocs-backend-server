@@ -1,6 +1,6 @@
 import { Server } from 'http';
 import app from './app.js';
-import { env } from './config/env.js';
+import { envVars } from './config/env.js';
 import { prisma } from './config/db.js';
 import { connectRedis } from './config/redis.js';
 import { verifyMailConnection } from './config/mail.js';
@@ -23,8 +23,8 @@ async function bootstrap() {
     await verifyMailConnection();
 
     // 4. Start HTTP Server
-    server = app.listen(env.PORT, () => {
-      console.log(`🚀 Server is running on port ${env.PORT} in ${env.NODE_ENV} mode`);
+    server = app.listen(envVars.PORT, () => {
+      console.log(`🚀 Server is running on port ${envVars.PORT} in ${envVars.NODE_ENV} mode`);
     });
   } catch (error) {
     console.error('❌ Bootstrap Error:', error);

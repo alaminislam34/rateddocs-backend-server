@@ -25,7 +25,7 @@ export const handlePrismaError = (err: PrismaErrorLike): TGenericErrorResponse =
     const targetFields = err.meta?.target ? err.meta.target.join(', ') : 'field';
     const capitalizedField = targetFields.charAt(0).toUpperCase() + targetFields.slice(1);
     message = `${capitalizedField} already exists. Please use a different value.`;
-    
+
     errorSources = (err.meta?.target || ['field']).map((field) => ({
       path: field,
       message: `${field} must be unique`,

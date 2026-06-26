@@ -1,16 +1,33 @@
 import { Request, Response } from 'express';
-import { catchAsync } from '../../utils/catchAsync.js';
-import { sendResponse } from '../../utils/sendResponse.js';
+import { catchAsync } from '../../shared/catchAsync.js';
+import { sendResponse } from '../../shared/sendResponse.js';
 import { fromNodeHeaders } from 'better-auth/node';
-import * as dentistService from './dentist.service.js';
 import { AppError } from '../../errors/AppError.js';
 import status from 'http-status';
+import { DentistService } from './dentist.service.js';
 
 /**
  * Register Dentist profile.
  */
-export const registerDentist = catchAsync(async (req: Request, res: Response) => {
-  const result = await dentistService.registerDentist(req.body, fromNodeHeaders(req.headers), req.file);
+const registerDentist = catchAsync(async (req: Request, res: Response) => {
+  const result = await DentistService.registerDentist(
+    req.body,
+    fromNodeHeaders(req.headers),
+    req.file,
+  );
+
+  if (result && 'needEmailVerify' in result && result.needEmailVerify) {
+    sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: 'User is already registered but email is not verified. A verification OTP has been sent to your email.',
+      data: {
+        needEmailVerify: true,
+        email: result.email,
+      },
+    });
+    return;
+  }
 
   sendResponse(res, {
     statusCode: 201,
@@ -23,13 +40,13 @@ export const registerDentist = catchAsync(async (req: Request, res: Response) =>
 /**
  * Submit Dentist Professional Data.
  */
-export const submitProfessionalData = catchAsync(async (req: Request, res: Response) => {
+const submitProfessionalData = catchAsync(async (req: Request, res: Response) => {
   const user = req.user;
   if (!user) {
     throw new AppError(status.UNAUTHORIZED, 'Unauthorized: User session not found');
   }
 
-  const result = await dentistService.submitProfessionalData(user.id, req.body);
+  const result = await DentistService.submitProfessionalData(user.id, req.body);
 
   sendResponse(res, {
     statusCode: 200,
@@ -42,13 +59,13 @@ export const submitProfessionalData = catchAsync(async (req: Request, res: Respo
 /**
  * Check official license registry (simulated API).
  */
-export const checkLicenseRegistry = catchAsync(async (req: Request, res: Response) => {
+const checkLicenseRegistry = catchAsync(async (req: Request, res: Response) => {
   const user = req.user;
   if (!user) {
     throw new AppError(status.UNAUTHORIZED, 'Unauthorized: User session not found');
   }
 
-  await dentistService.checkLicenseRegistry(user.id, req.body);
+  await DentistService.checkLicenseRegistry(user.id, req.body);
 
   sendResponse(res, {
     statusCode: 200,
@@ -61,7 +78,7 @@ export const checkLicenseRegistry = catchAsync(async (req: Request, res: Respons
 /**
  * Submit manual license certificate PDF.
  */
-export const submitLicense = catchAsync(async (req: Request, res: Response) => {
+const submitLicense = catchAsync(async (req: Request, res: Response) => {
   const user = req.user;
   if (!user) {
     throw new AppError(status.UNAUTHORIZED, 'Unauthorized: User session not found');
@@ -71,7 +88,12 @@ export const submitLicense = catchAsync(async (req: Request, res: Response) => {
   const licenseFile = files?.['licenseDocument']?.[0];
   const profilePictureFile = files?.['profilePicture']?.[0];
 
-  const result = await dentistService.submitLicense(user.id, req.body, licenseFile, profilePictureFile);
+  const result = await DentistService.submitLicense(
+    user.id,
+    req.body,
+    licenseFile,
+    profilePictureFile,
+  );
 
   sendResponse(res, {
     statusCode: 200,
@@ -84,7 +106,7 @@ export const submitLicense = catchAsync(async (req: Request, res: Response) => {
 /**
  * Submit Dentist Operations details and custom procedures.
  */
-export const submitOperations = catchAsync(async (req: Request, res: Response) => {
+const submitOperations = catchAsync(async (req: Request, res: Response) => {
   const user = req.user;
   if (!user) {
     throw new AppError(status.UNAUTHORIZED, 'Unauthorized: User session not found');
@@ -95,7 +117,13 @@ export const submitOperations = catchAsync(async (req: Request, res: Response) =
   const videoFile = files?.['walkthroughVideo']?.[0];
   const csvFile = files?.['csvFile']?.[0];
 
-  const result = await dentistService.submitOperations(user.id, req.body, jciFile, videoFile, csvFile);
+  const result = await DentistService.submitOperations(
+    user.id,
+    req.body,
+    jciFile,
+    videoFile,
+    csvFile,
+  );
 
   sendResponse(res, {
     statusCode: 200,
@@ -108,13 +136,13 @@ export const submitOperations = catchAsync(async (req: Request, res: Response) =
 /**
  * Submit Dentist Clinic Depth verification metrics.
  */
-export const submitClinicDepth = catchAsync(async (req: Request, res: Response) => {
+const submitClinicDepth = catchAsync(async (req: Request, res: Response) => {
   const user = req.user;
   if (!user) {
     throw new AppError(status.UNAUTHORIZED, 'Unauthorized: User session not found');
   }
 
-  const result = await dentistService.submitClinicDepth(user.id, req.body);
+  const result = await DentistService.submitClinicDepth(user.id, req.body);
 
   sendResponse(res, {
     statusCode: 200,
@@ -127,13 +155,13 @@ export const submitClinicDepth = catchAsync(async (req: Request, res: Response) 
 /**
  * Get current verification progress and RVD score.
  */
-export const getVerificationProgress = catchAsync(async (req: Request, res: Response) => {
+const getVerificationProgress = catchAsync(async (req: Request, res: Response) => {
   const user = req.user;
   if (!user) {
     throw new AppError(status.UNAUTHORIZED, 'Unauthorized: User session not found');
   }
 
-  const result = await dentistService.getVerificationProgress(user.id);
+  const result = await DentistService.getVerificationProgress(user.id);
 
   sendResponse(res, {
     statusCode: 200,
@@ -143,98 +171,12 @@ export const getVerificationProgress = catchAsync(async (req: Request, res: Resp
   });
 });
 
-/**
- * Admin: Approve/Reject Dentist License document (30% RVD)
- */
-export const verifyLicenseAdmin = catchAsync(async (req: Request, res: Response) => {
-  const dentistId = req.params.dentistId as string;
-  const { isApproved, note } = req.body;
-
-  if (typeof isApproved !== 'boolean') {
-    throw new AppError(status.BAD_REQUEST, 'isApproved field must be a boolean');
-  }
-
-  if (isApproved === false && (!note || typeof note !== 'string' || note.trim() === '')) {
-    throw new AppError(status.BAD_REQUEST, 'A note containing the rejection reason is required when rejecting verification.', 'note');
-  }
-
-  const result = await dentistService.verifyLicenseAdmin(dentistId, isApproved, note);
-
-  sendResponse(res, {
-    statusCode: 200,
-    success: true,
-    message: 'License verification updated successfully.',
-    data: result,
-  });
-});
-
-/**
- * Admin: Approve/Reject Dentist Operations (40% RVD)
- */
-export const verifyOperationsAdmin = catchAsync(async (req: Request, res: Response) => {
-  const dentistId = req.params.dentistId as string;
-  const { isApproved, note } = req.body;
-
-  if (typeof isApproved !== 'boolean') {
-    throw new AppError(status.BAD_REQUEST, 'isApproved field must be a boolean');
-  }
-
-  if (isApproved === false && (!note || typeof note !== 'string' || note.trim() === '')) {
-    throw new AppError(status.BAD_REQUEST, 'A note containing the rejection reason is required when rejecting verification.', 'note');
-  }
-
-  const result = await dentistService.verifyOperationsAdmin(dentistId, isApproved, note);
-
-  sendResponse(res, {
-    statusCode: 200,
-    success: true,
-    message: 'Operations verification updated successfully.',
-    data: result,
-  });
-});
-
-/**
- * Admin: Approve/Reject Dentist Clinic Depth (30% RVD)
- */
-export const verifyClinicDepthAdmin = catchAsync(async (req: Request, res: Response) => {
-  const dentistId = req.params.dentistId as string;
-  const { isApproved, note } = req.body;
-
-  if (typeof isApproved !== 'boolean') {
-    throw new AppError(status.BAD_REQUEST, 'isApproved field must be a boolean');
-  }
-
-  if (isApproved === false && (!note || typeof note !== 'string' || note.trim() === '')) {
-    throw new AppError(status.BAD_REQUEST, 'A note containing the rejection reason is required when rejecting verification.', 'note');
-  }
-
-  const result = await dentistService.verifyClinicDepthAdmin(dentistId, isApproved, note);
-
-  sendResponse(res, {
-    statusCode: 200,
-    success: true,
-    message: 'Clinic depth verification updated successfully.',
-    data: result,
-  });
-});
-
-/**
- * Admin: Retrieve all dentist verification requests with search, filter, and pagination
- */
-export const getVerificationsListAdmin = catchAsync(async (req: Request, res: Response) => {
-  const { status: verifyStatus, search, page, limit } = req.query;
-
-  const result = await dentistService.getVerificationsListAdmin({
-    status: verifyStatus ? String(verifyStatus) : undefined,
-    search: search ? String(search) : undefined,
-    page: page ? Number(page) : undefined,
-    limit: limit ? Number(limit) : undefined,
-  });
-
-  sendResponse(res, {
-    statusCode: 200,
-    success: true,
-    message: 'Dentist verifications list retrieved successfully.',
-    data: result,
-  });
-});
+export const DentistController = {
+  registerDentist,
+  submitProfessionalData,
+  checkLicenseRegistry,
+  submitLicense,
+  submitOperations,
+  submitClinicDepth,
+  getVerificationProgress,
+};

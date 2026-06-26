@@ -1,78 +1,120 @@
 import { Request, Response } from 'express';
-import { catchAsync } from '../../utils/catchAsync.js';
-import { sendResponse } from '../../utils/sendResponse.js';
-import { auth } from '../../config/auth.js';
+import { catchAsync } from '../../shared/catchAsync.js';
+import { sendResponse } from '../../shared/sendResponse.js';
 import { fromNodeHeaders } from 'better-auth/node';
-import { UserRole } from '../../generated/prisma/index.js';
+import { AuthService } from './auth.service.js';
+import status from 'http-status';
 import { AppError } from '../../errors/AppError.js';
-import { env } from '../../config/env.js';
-import * as authService from './auth.service.js';
+import { tokenUtils } from '../../utils/token.js';
 
-const handleCredentialsLogin = async (req: Request, res: Response, allowedRoles: UserRole[]) => {
-  const { email, password } = req.body;
+const loginUser = catchAsync(async (req: Request, res: Response) => {
+  const payload = req.body;
+  const clientHeaders = fromNodeHeaders(req.headers);
 
-  await authService.verifyUserRoleAndGet(email, allowedRoles);
+  const result = await AuthService.loginUser(payload, clientHeaders);
 
-  const response = await auth.api.signInEmail({
-    body: { email, password },
-    asResponse: true,
-    headers: fromNodeHeaders(req.headers),
-  });
-
-  if (!response.ok) {
-    let errorMessage = 'Invalid email or password';
-    try {
-      const errorBody = (await response.json()) as { message?: string; code?: string };
-      errorMessage = errorBody.message || errorMessage;
-    } catch {
-      // Ignore JSON parsing errors
-    }
-    throw new AppError(response.status, errorMessage);
+  if (result.twoFactorRequired) {
+    sendResponse(res, {
+      statusCode: status.OK,
+      success: true,
+      message: 'Two-step verification required. A verification OTP has been sent to your email.',
+      data: {
+        twoFactorRequired: true,
+        email: result.email,
+      },
+    });
+    return;
   }
 
-  const data = await response.json();
-
-  response.headers.forEach((value, key) => {
+  const { data, headers, accessToken, refreshToken } = result as {
+    data: Record<string, unknown>;
+    headers: [string, string][];
+    accessToken: string;
+    refreshToken: string;
+  };
+  headers.forEach(([key, value]: [string, string]) => {
     res.setHeader(key, value);
   });
+
+  // Set secure HTTP-only cookies for JWT tokens
+  tokenUtils.setAccessTokenCookie(res, accessToken);
+  tokenUtils.setRefreshTokenCookie(res, refreshToken);
 
   sendResponse(res, {
     statusCode: 200,
     success: true,
     message: 'Logged in successfully',
-    data,
+    data: {
+      ...data,
+      accessToken,
+      refreshToken,
+    },
   });
-};
-
-/**
- * Log in a Patient
- */
-export const loginPatient = catchAsync(async (req: Request, res: Response) => {
-  await handleCredentialsLogin(req, res, [UserRole.PATIENT]);
 });
 
-/**
- * Log in a Dentist
- */
-export const loginDentist = catchAsync(async (req: Request, res: Response) => {
-  await handleCredentialsLogin(req, res, [UserRole.DENTIST]);
+const loginAdmin = catchAsync(async (req: Request, res: Response) => {
+  const payload = req.body;
+  const clientHeaders = fromNodeHeaders(req.headers);
+
+  const result = await AuthService.loginAdmin(payload, clientHeaders);
+
+  if (result.twoFactorRequired) {
+    sendResponse(res, {
+      statusCode: status.OK,
+      success: true,
+      message: 'Two-step verification required. A verification OTP has been sent to your email.',
+      data: {
+        twoFactorRequired: true,
+        email: result.email,
+      },
+    });
+    return;
+  }
+
+  const { data, headers, accessToken, refreshToken } = result as {
+    data: Record<string, unknown>;
+    headers: [string, string][];
+    accessToken: string;
+    refreshToken: string;
+  };
+  headers.forEach(([key, value]: [string, string]) => {
+    res.setHeader(key, value);
+  });
+
+  // Set secure HTTP-only cookies for JWT tokens
+  tokenUtils.setAccessTokenCookie(res, accessToken);
+  tokenUtils.setRefreshTokenCookie(res, refreshToken);
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: 'Logged in successfully',
+    data: {
+      ...data,
+      accessToken,
+      refreshToken,
+    },
+  });
 });
 
-/**
- * Log in an Admin / Super Admin
- */
-export const loginAdmin = catchAsync(async (req: Request, res: Response) => {
-  await handleCredentialsLogin(req, res, [UserRole.ADMIN, UserRole.SUPER_ADMIN]);
-});
-
-/**
- * Register a new Patient and send verification OTP
- */
-export const registerPatient = catchAsync(async (req: Request, res: Response) => {
+const registerPatient = catchAsync(async (req: Request, res: Response) => {
   const { email, password } = req.body;
   const headers = fromNodeHeaders(req.headers);
 
-  await authService.registerPatient(email, password, headers);
+  const result = await AuthService.registerPatient(email, password, headers);
+
+  if (result && typeof result === 'object' && 'needEmailVerify' in result && result.needEmailVerify) {
+    sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: 'User is already registered but email is not verified. A verification OTP has been sent to your email.',
+      data: {
+        needEmailVerify: true,
+        email: result.email,
+      },
+    });
+    return;
+  }
 
   sendResponse(res, {
     statusCode: 201,
@@ -82,19 +124,17 @@ export const registerPatient = catchAsync(async (req: Request, res: Response) =>
   });
 });
 
-export const verifyEmailOtp = catchAsync(async (req: Request, res: Response) => {
+const verifyEmailOtp = catchAsync(async (req: Request, res: Response) => {
   const { email, otp } = req.body;
 
-  const result = await authService.verifyEmailOtp(email, otp);
+  const result = await AuthService.verifyEmailOtp(email, otp);
 
-  // Set the session token in the response cookie to log the user in automatically
-  res.cookie('better-auth.session_token', result.token, {
-    path: '/',
-    httpOnly: true,
-    secure: env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    expires: result.expiresAt,
-  });
+  // Set Better-Auth session cookie
+  tokenUtils.setBetterAuthSessionTokenCookie(res, result.token);
+
+  // Set secure HTTP-only cookies for JWT tokens
+  tokenUtils.setAccessTokenCookie(res, result.accessToken);
+  tokenUtils.setRefreshTokenCookie(res, result.refreshToken);
 
   sendResponse(res, {
     statusCode: 200,
@@ -102,6 +142,8 @@ export const verifyEmailOtp = catchAsync(async (req: Request, res: Response) => 
     message: 'Email verified successfully. You have been logged in automatically.',
     data: {
       user: result.user,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
       session: {
         token: result.token,
         expiresAt: result.expiresAt,
@@ -110,41 +152,37 @@ export const verifyEmailOtp = catchAsync(async (req: Request, res: Response) => 
   });
 });
 
-/**
- * Initiates Google OAuth redirect flow
- */
-export const initiateGoogleLogin = catchAsync(async (req: Request, res: Response) => {
-  const result = await auth.api.signInSocial({
-    body: {
-      provider: 'google',
-      callbackURL: `${env.FRONTEND_URL}/dashboard`,
-    },
-    headers: fromNodeHeaders(req.headers),
-  });
+const initiateGoogleLoginController = catchAsync(async (req: Request, res: Response) => {
+  const clientHeaders = fromNodeHeaders(req.headers);
+  const result = await AuthService.initiateGoogleLogin(clientHeaders);
 
-  if (result && 'url' in result && result.url) {
-    res.redirect(result.url);
-  } else {
-    throw new AppError(500, 'Failed to initiate Google OAuth flow');
+  if (result.headers) {
+    const setCookies = result.headers.getSetCookie();
+    if (setCookies && setCookies.length > 0) {
+      res.setHeader('Set-Cookie', setCookies);
+    }
+
+    result.headers.forEach((value, key) => {
+      if (key.toLowerCase() !== 'set-cookie') {
+        res.setHeader(key, value);
+      }
+    });
   }
+
+  res.redirect(result.url);
 });
 
-/**
- * Invalidate session in database & clear cookies
- */
-export const logout = catchAsync(async (req: Request, res: Response) => {
-  // Invalidate session in database
-  await auth.api.signOut({
-    headers: fromNodeHeaders(req.headers),
-  });
+const logout = catchAsync(async (req: Request, res: Response) => {
+  const clientHeaders = fromNodeHeaders(req.headers);
+  await AuthService.logout(clientHeaders);
 
-  // Explicitly clear session cookie
-  res.clearCookie('better-auth.session-token', {
-    path: '/',
-    httpOnly: true,
-    secure: env.NODE_ENV === 'production',
-    sameSite: 'lax',
-  });
+  // Clear Better-Auth session cookies
+  res.clearCookie('better-auth.session-token', { path: '/' });
+  res.clearCookie('better-auth.session_token', { path: '/' });
+
+  // Clear JWT access and refresh token cookies
+  res.clearCookie('accessToken', { path: '/' });
+  res.clearCookie('refreshToken', { path: '/' });
 
   sendResponse(res, {
     statusCode: 200,
@@ -153,3 +191,81 @@ export const logout = catchAsync(async (req: Request, res: Response) => {
     data: null,
   });
 });
+
+const verify2faOtp = catchAsync(async (req: Request, res: Response) => {
+  const { email, otp } = req.body;
+
+  const result = await AuthService.verify2faOtp(email, otp);
+
+  // Set Better-Auth session cookie
+  tokenUtils.setBetterAuthSessionTokenCookie(res, result.token);
+
+  // Set secure HTTP-only cookies for JWT tokens
+  tokenUtils.setAccessTokenCookie(res, result.accessToken);
+  tokenUtils.setRefreshTokenCookie(res, result.refreshToken);
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: 'Two-step verification successful. You have been logged in.',
+    data: {
+      user: result.user,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      session: {
+        token: result.token,
+        expiresAt: result.expiresAt,
+      },
+    },
+  });
+});
+
+const resendOtp = catchAsync(async (req: Request, res: Response) => {
+  const { email } = req.body;
+
+  await AuthService.resendOtp(email);
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: 'Verification OTP has been resent to your email.',
+    data: null,
+  });
+});
+
+const getSession = catchAsync(async (req: Request, res: Response) => {
+  const clientHeaders = fromNodeHeaders(req.headers);
+  const incomingUserAgent = req.headers['user-agent'] as string | undefined;
+  const incomingIp = ((req.headers['x-forwarded-for'] as string) ||
+    req.socket.remoteAddress ||
+    req.ip) as string | undefined;
+
+  const result = await AuthService.getSession(clientHeaders, incomingUserAgent, incomingIp);
+
+  if (!result) {
+    throw new AppError(status.UNAUTHORIZED, 'Unauthorized: Access token is missing or invalid');
+  }
+
+  // Set secure HTTP-only cookies for JWT tokens
+  tokenUtils.setAccessTokenCookie(res, result.accessToken);
+  tokenUtils.setRefreshTokenCookie(res, result.refreshToken);
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: 'Session retrieved successfully.',
+    data: result,
+  });
+});
+
+export const AuthController = {
+  loginUser,
+  loginAdmin,
+  logout,
+  registerPatient,
+  verifyEmailOtp,
+  initiateGoogleLoginController,
+  verify2faOtp,
+  resendOtp,
+  getSession,
+};

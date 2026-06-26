@@ -7,11 +7,11 @@ export class AppError extends Error {
     super(message);
     this.statusCode = statusCode;
     this.isOperational = true;
-    
+
     if (path) {
       this.path = path;
     }
-    
+
     if (stack) {
       this.stack = stack;
     } else {

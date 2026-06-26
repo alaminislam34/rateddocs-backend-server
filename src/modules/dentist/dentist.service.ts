@@ -2,9 +2,14 @@ import status from 'http-status';
 import { prisma } from '../../config/db.js';
 import { AppError } from '../../errors/AppError.js';
 import { auth } from '../../config/auth.js';
-import { generateAndSendOTP } from '../auth/auth.service.js';
-import { UserRole, LicenseVerificationStatus, DentistVerificationPhase, Prisma } from '../../generated/prisma/index.js';
-import { uploadToCloudinary } from '../../utils/fileUpload.js';
+import { generateAndSendOTP } from '../../shared/generateOtp.js';
+import {
+  UserRole,
+  LicenseVerificationStatus,
+  DentistVerificationPhase,
+  Prisma,
+} from '../../generated/prisma/index.js';
+import { uploadToCloudinary } from '../../shared/fileUpload.js';
 import {
   IRegisterDentist,
   ISubmitProfessionalData,
@@ -78,61 +83,38 @@ const upsertDentistProcedure = async (
   });
 };
 
-
-
-/**
- * Recalculates the dynamic RVD score for a dentist based on their verification status.
- * License: 30%, Operations: 40%, Clinic Depth: 30%.
- */
-const updateRvdScore = async (tx: Prisma.TransactionClient, dentistId: string) => {
-  const progress = await tx.dentistVerificationProgress.findUnique({
-    where: { dentistId },
-  });
-
-  if (!progress) return;
-
-  let rvdScore = 0;
-  if (progress.isLicenseVerified) rvdScore += 30;
-  if (progress.isOperationsVerified) rvdScore += 40;
-  if (progress.isClinicDepthVerified) rvdScore += 30;
-
-  await tx.dentistVerificationProgress.update({
-    where: { dentistId },
-    data: { rvdScore },
-  });
-};
-
 /**
  * Registers a new Dentist, creates their profiles and verification tracker, and dispatches email OTP.
  */
-export const registerDentist = async (payload: IRegisterDentist, headers: Headers, headshotFile?: Express.Multer.File) => {
-  const {
-    firstName,
-    lastName,
-    email,
-    phoneNumber,
-    gender,
-    country,
-    referralCode,
-    password,
-  } = payload;
+const registerDentist = async (
+  payload: IRegisterDentist,
+  headers: Headers,
+  headshotFile?: Express.Multer.File,
+) => {
+  const { firstName, lastName, email, phoneNumber, gender, country, referralCode, password } =
+    payload;
 
-  // 1. Check if user already exists
   const existingUser = await prisma.user.findUnique({
     where: { email },
   });
 
   if (existingUser) {
     if (existingUser.emailVerified) {
-      throw new AppError(status.CONFLICT, 'User with this email already exists', 'email');
+      return {
+        needEmailVerify: true,
+        email,
+      };
     }
-    // Delete unverified user
-    await prisma.user.delete({
-      where: { id: existingUser.id },
-    });
+    // Generate and send verification OTP
+    const name = `${firstName} ${lastName}`;
+    await generateAndSendOTP(email, name);
+
+    return {
+      needEmailVerify: true,
+      email,
+    };
   }
 
-  // 2. Call Better-Auth signUpEmail to hash password and register user
   const name = `${firstName} ${lastName}`;
   const signUpResult = await auth.api.signUpEmail({
     body: {
@@ -155,9 +137,7 @@ export const registerDentist = async (payload: IRegisterDentist, headers: Header
     headshotUrl = uploadResult.secure_url;
   }
 
-  // 3. Update User role and details, create Dentist profile and progress in transaction
   const dentist = await prisma.$transaction(async (tx) => {
-    // Upgrade user role to DENTIST
     await tx.user.update({
       where: { id: userId },
       data: {
@@ -201,7 +181,7 @@ export const registerDentist = async (payload: IRegisterDentist, headers: Header
 /**
  * Submits Dentist Professional Data (legal name, specialty, etc.)
  */
-export const submitProfessionalData = async (userId: string, payload: ISubmitProfessionalData) => {
+const submitProfessionalData = async (userId: string, payload: ISubmitProfessionalData) => {
   const dentist = await prisma.dentist.findUnique({
     where: { userId },
   });
@@ -210,8 +190,8 @@ export const submitProfessionalData = async (userId: string, payload: ISubmitPro
     throw new AppError(status.NOT_FOUND, 'Dentist profile not found');
   }
 
-  // Find or create primary specialty
-  let specialty = await prisma.specialty.findFirst({
+  // Find primary specialty (must be pre-created by admin)
+  const specialty = await prisma.specialty.findFirst({
     where: {
       OR: [
         { id: payload.primarySpecialty },
@@ -221,14 +201,11 @@ export const submitProfessionalData = async (userId: string, payload: ISubmitPro
   });
 
   if (!specialty) {
-    // Automatically seed a specialty if not found for testing
-    const slug = payload.primarySpecialty.toLowerCase().replace(/\s+/g, '-');
-    specialty = await prisma.specialty.create({
-      data: {
-        name: payload.primarySpecialty,
-        slug,
-      },
-    });
+    throw new AppError(
+      status.NOT_FOUND,
+      'Selected primary specialty is invalid or not registered by admin. Please contact support.',
+      'primarySpecialty',
+    );
   }
 
   await prisma.$transaction(async (tx) => {
@@ -265,7 +242,7 @@ export const submitProfessionalData = async (userId: string, payload: ISubmitPro
  * Simulates check against official registry.
  * Always fails to force manual document verification per requirements.
  */
-export const checkLicenseRegistry = async (userId: string, _payload: ICheckLicense) => {
+const checkLicenseRegistry = async (userId: string, _payload: ICheckLicense) => {
   const dentist = await prisma.dentist.findUnique({
     where: { userId },
   });
@@ -278,18 +255,18 @@ export const checkLicenseRegistry = async (userId: string, _payload: ICheckLicen
   throw new AppError(
     status.NOT_FOUND,
     'License registration number not found in the official registry database. Please upload your license certificate PDF for manual verification.',
-    'registrationNumber'
+    'registrationNumber',
   );
 };
 
 /**
  * Submits Dentist License PDF for manual verification.
  */
-export const submitLicense = async (
+const submitLicense = async (
   userId: string,
   payload: ISubmitLicense,
   licenseFile?: Express.Multer.File,
-  profilePictureFile?: Express.Multer.File
+  profilePictureFile?: Express.Multer.File,
 ) => {
   const dentist = await prisma.dentist.findUnique({
     where: { userId },
@@ -300,7 +277,11 @@ export const submitLicense = async (
   }
 
   if (!licenseFile) {
-    throw new AppError(status.BAD_REQUEST, 'License certificate file is required', 'licenseDocument');
+    throw new AppError(
+      status.BAD_REQUEST,
+      'License certificate file is required',
+      'licenseDocument',
+    );
   }
 
   const uploadResult = await uploadToCloudinary(licenseFile.buffer, 'dentists/licenses');
@@ -308,7 +289,10 @@ export const submitLicense = async (
 
   let profilePictureUrl: string | undefined;
   if (profilePictureFile) {
-    const uploadProfileResult = await uploadToCloudinary(profilePictureFile.buffer, 'dentists/headshots');
+    const uploadProfileResult = await uploadToCloudinary(
+      profilePictureFile.buffer,
+      'dentists/headshots',
+    );
     profilePictureUrl = uploadProfileResult.secure_url;
   }
 
@@ -351,23 +335,26 @@ export const submitLicense = async (
         dentistId: dentist.id,
         verificationStatus: LicenseVerificationStatus.PENDING,
         isVerified: false,
-        verificationRequestNote: 'Manual license document and profile picture submitted for review.',
+        verificationRequestNote:
+          'Manual license document and profile picture submitted for review.',
       },
     });
   });
 
-  return { message: 'License document and profile picture submitted for verification successfully.' };
+  return {
+    message: 'License document and profile picture submitted for verification successfully.',
+  };
 };
 
 /**
  * Submits Dentist Operations (JCI certificate, walkthrough videos, agreedToGuarantee, and procedures).
  */
-export const submitOperations = async (
+const submitOperations = async (
   userId: string,
   payload: ISubmitOperations,
   jciFile?: Express.Multer.File,
   videoFile?: Express.Multer.File,
-  csvFile?: Express.Multer.File
+  csvFile?: Express.Multer.File,
 ) => {
   const dentist = await prisma.dentist.findUnique({
     where: { userId },
@@ -379,7 +366,10 @@ export const submitOperations = async (
 
   let jciUrl: string | undefined;
   if (jciFile) {
-    const uploadResult = await uploadToCloudinary(jciFile.buffer, 'dentists/operations/certificates');
+    const uploadResult = await uploadToCloudinary(
+      jciFile.buffer,
+      'dentists/operations/certificates',
+    );
     jciUrl = uploadResult.secure_url;
   }
 
@@ -397,7 +387,11 @@ export const submitOperations = async (
   const finalVideoUrl = videoUrl || existingOps?.walkthroughVideo || null;
 
   if (!finalJciUrl && !finalVideoUrl) {
-    throw new AppError(status.BAD_REQUEST, 'Either JCI Certificate or Walkthrough Video file must be uploaded.', 'jciCertificate');
+    throw new AppError(
+      status.BAD_REQUEST,
+      'Either JCI Certificate or Walkthrough Video file must be uploaded.',
+      'jciCertificate',
+    );
   }
 
   await prisma.$transaction(async (tx) => {
@@ -444,9 +438,8 @@ export const submitOperations = async (
         .filter((r) => r.length > 0);
 
       // Skip the header row if present (first cell is not a number)
-      const dataRows = rows[0]?.split(',')[1] && isNaN(Number(rows[0].split(',')[1]))
-        ? rows.slice(1)
-        : rows;
+      const dataRows =
+        rows[0]?.split(',')[1] && isNaN(Number(rows[0].split(',')[1])) ? rows.slice(1) : rows;
 
       for (const row of dataRows) {
         const [rawName, rawPrice, rawNotes] = row.split(',').map((c) => c.trim());
@@ -467,7 +460,7 @@ export const submitOperations = async (
 /**
  * Submits Dentist Clinic Depth verification details.
  */
-export const submitClinicDepth = async (userId: string, payload: ISubmitClinicDepth) => {
+const submitClinicDepth = async (userId: string, payload: ISubmitClinicDepth) => {
   const dentist = await prisma.dentist.findUnique({
     where: { userId },
   });
@@ -515,128 +508,9 @@ export const submitClinicDepth = async (userId: string, payload: ISubmitClinicDe
 };
 
 /**
- * Admin: Verify Dentist License (Adds 30% to RVD Score)
- */
-export const verifyLicenseAdmin = async (dentistId: string, isApproved: boolean, note?: string) => {
-  const dentist = await prisma.dentist.findUnique({
-    where: { id: dentistId },
-  });
-
-  if (!dentist) {
-    throw new AppError(status.NOT_FOUND, 'Dentist profile not found');
-  }
-
-  await prisma.$transaction(async (tx) => {
-    const statusVal = isApproved ? LicenseVerificationStatus.VERIFIED : LicenseVerificationStatus.REJECTED;
-
-    await tx.dentistLicense.update({
-      where: { dentistId },
-      data: {
-        isVerified: isApproved,
-        verificationStatus: statusVal,
-        verifiedAt: isApproved ? new Date() : null,
-      },
-    });
-
-    await tx.dentistVerificationProgress.update({
-      where: { dentistId },
-      data: {
-        isLicenseVerified: isApproved,
-        currentPhase: isApproved ? DentistVerificationPhase.OPERATIONS : DentistVerificationPhase.LICENSE,
-      },
-    });
-
-    await tx.dentistLicenseVerification.create({
-      data: {
-        dentistId,
-        verificationStatus: statusVal,
-        isVerified: isApproved,
-        verificationNote: note || (isApproved ? 'Approved by Admin' : 'Rejected by Admin'),
-      },
-    });
-
-    await updateRvdScore(tx, dentistId);
-  });
-
-  return { message: `License verification status set to: ${isApproved ? 'VERIFIED' : 'REJECTED'}` };
-};
-
-/**
- * Admin: Verify Dentist Operations (Adds 40% to RVD Score)
- */
-export const verifyOperationsAdmin = async (dentistId: string, isApproved: boolean, note?: string) => {
-  const dentist = await prisma.dentist.findUnique({
-    where: { id: dentistId },
-  });
-
-  if (!dentist) {
-    throw new AppError(status.NOT_FOUND, 'Dentist profile not found');
-  }
-
-  await prisma.$transaction(async (tx) => {
-    await tx.dentistOperationsVerification.update({
-      where: { dentistId },
-      data: {
-        isVerified: isApproved,
-        verifiedAt: isApproved ? new Date() : null,
-        verificationNote: note || (isApproved ? 'Approved by Admin' : 'Rejected by Admin'),
-      },
-    });
-
-    await tx.dentistVerificationProgress.update({
-      where: { dentistId },
-      data: {
-        isOperationsVerified: isApproved,
-        currentPhase: isApproved ? DentistVerificationPhase.CLINIC : DentistVerificationPhase.OPERATIONS,
-      },
-    });
-
-    await updateRvdScore(tx, dentistId);
-  });
-
-  return { message: `Operations verification status set to: ${isApproved ? 'VERIFIED' : 'REJECTED'}` };
-};
-
-/**
- * Admin: Verify Dentist Clinic Depth (Adds 30% to RVD Score)
- */
-export const verifyClinicDepthAdmin = async (dentistId: string, isApproved: boolean, note?: string) => {
-  const dentist = await prisma.dentist.findUnique({
-    where: { id: dentistId },
-  });
-
-  if (!dentist) {
-    throw new AppError(status.NOT_FOUND, 'Dentist profile not found');
-  }
-
-  await prisma.$transaction(async (tx) => {
-    await tx.dentistClinicDepthVerification.update({
-      where: { dentistId },
-      data: {
-        isVerified: isApproved,
-        verifiedAt: isApproved ? new Date() : null,
-        verificationNote: note || (isApproved ? 'Approved by Admin' : 'Rejected by Admin'),
-      },
-    });
-
-    await tx.dentistVerificationProgress.update({
-      where: { dentistId },
-      data: {
-        isClinicDepthVerified: isApproved,
-        currentPhase: isApproved ? DentistVerificationPhase.CLINIC : DentistVerificationPhase.CLINIC, // Remains in clinic/fully verified
-      },
-    });
-
-    await updateRvdScore(tx, dentistId);
-  });
-
-  return { message: `Clinic depth verification status set to: ${isApproved ? 'VERIFIED' : 'REJECTED'}` };
-};
-
-/**
  * Retrieve current dentist verification progress and score
  */
-export const getVerificationProgress = async (userId: string) => {
+const getVerificationProgress = async (userId: string) => {
   const dentist = await prisma.dentist.findUnique({
     where: { userId },
   });
@@ -652,85 +526,13 @@ export const getVerificationProgress = async (userId: string) => {
   return progress;
 };
 
-/**
- * Admin: Retrieve list of all dentist verification submissions with filter, search, and pagination.
- */
-export const getVerificationsListAdmin = async (query: {
-  status?: string;
-  search?: string;
-  page?: number;
-  limit?: number;
-}) => {
-  const page = Number(query.page) || 1;
-  const limit = Number(query.limit) || 10;
-  const skip = (page - 1) * limit;
 
-  const whereConditions: Prisma.DentistWhereInput = {
-    ...(query.status
-      ? {
-          dentistLicense: {
-            verificationStatus: query.status as LicenseVerificationStatus,
-          },
-        }
-      : {}),
-    ...(query.search
-      ? {
-          OR: [
-            {
-              user: {
-                OR: [
-                  { firstName: { contains: query.search, mode: 'insensitive' } },
-                  { lastName: { contains: query.search, mode: 'insensitive' } },
-                  { email: { contains: query.search, mode: 'insensitive' } },
-                ],
-              },
-            },
-            {
-              phoneNumber: { contains: query.search },
-            },
-          ],
-        }
-      : {}),
-  };
-
-  const dentists = await prisma.dentist.findMany({
-    where: whereConditions,
-    skip,
-    take: limit,
-    include: {
-      user: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          image: true,
-        },
-      },
-      dentistProfessionalData: true,
-      dentistLicense: true,
-      dentistOperationsVerifications: true,
-      dentistClinicDepthVerification: {
-        include: {
-          procedureDocs: true,
-        },
-      },
-      dentistVerificationProgress: true,
-    },
-    orderBy: {
-      createdAt: 'desc',
-    },
-  });
-
-  const total = await prisma.dentist.count({ where: whereConditions });
-
-  return {
-    meta: {
-      page,
-      limit,
-      total,
-      totalPage: Math.ceil(total / limit),
-    },
-    data: dentists,
-  };
+export const DentistService = {
+  registerDentist,
+  submitProfessionalData,
+  checkLicenseRegistry,
+  submitLicense,
+  submitOperations,
+  submitClinicDepth,
+  getVerificationProgress,
 };

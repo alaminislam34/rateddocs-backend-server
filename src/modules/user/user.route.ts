@@ -7,6 +7,11 @@ import * as userController from './user.controller.js';
 const router = Router();
 
 router.get('/me', authMiddleware(), userController.getMyProfile);
-router.patch('/me', authMiddleware(), validateRequest(updateProfileSchema), userController.updateMyProfile);
+router.patch(
+  '/me',
+  authMiddleware(),
+  validateRequest(updateProfileSchema),
+  userController.updateMyProfile,
+);
 
 export const userRoutes = router;
