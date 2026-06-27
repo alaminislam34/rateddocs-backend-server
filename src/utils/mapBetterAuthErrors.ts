@@ -39,6 +39,6 @@ export const mapBetterAuthError = (error: unknown): AppError => {
         authError.body?.message ??
         authError.message ??
         "Authentication failed.";
-
-    return new AppError(statusCode, message, undefined, true, code);
+    // update it brother (StatusCode, message, path, stack, errorCode, isOperational)
+    return new AppError(statusCode, message, "", "", code, true);
 };

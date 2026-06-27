@@ -23,3 +23,12 @@ export const verifyStepSchema = z.object({
     note: z.string().optional(),
   }),
 });
+
+export const verifyPhaseSchema = z.object({
+  body: z.object({
+    phase: z.enum(['ph1', 'ph2', 'ph3']),
+    isApproved: z.boolean(),
+    note: z.string().optional(),
+  }),
+});
+

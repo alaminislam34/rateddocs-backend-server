@@ -1,16 +1,16 @@
 model User {
-  id            String     @id @default(cuid())
-  email         String     @unique
-  firstName     String?    @map("first_name") @db.VarChar(255)
-  lastName      String?    @map("last_name") @db.VarChar(255)
-  name          String?
-  emailVerified Boolean    @default(false)
-  verifiedAt    DateTime?
-  image         String?
-  role          UserRole   @default(PATIENT)
-  status        UserStatus @default(ACTIVE)
-  gender        Gender?
-  twoFactorEnabled Boolean @default(false) @map("two_factor_enabled")
+  id               String     @id @default(cuid())
+  email            String     @unique
+  firstName        String?    @map("first_name") @db.VarChar(255)
+  lastName         String?    @map("last_name") @db.VarChar(255)
+  name             String?
+  emailVerified    Boolean    @default(false)
+  verifiedAt       DateTime?
+  image            String?
+  role             UserRole   @default(PATIENT)
+  status           UserStatus @default(ACTIVE)
+  gender           Gender?
+  twoFactorEnabled Boolean    @default(false) @map("two_factor_enabled")
 
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
@@ -19,9 +19,11 @@ model User {
   sessions  Session[]
   accounts  Account[]
 
-  patient Patient?
-  dentist Dentist?
-  admin   Admin?
+  patient             Patient?
+  dentist             Dentist?
+  admin               Admin?
+  wallet              Wallet?
+  verificationRequest VerificationRequest?
 
   @@map("user")
 }

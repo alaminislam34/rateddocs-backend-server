@@ -18,7 +18,7 @@ const registerDentist = catchAsync(async (req: Request, res: Response) => {
 
   if (result && 'needEmailVerify' in result && result.needEmailVerify) {
     sendResponse(res, {
-      statusCode: 200,
+      statusCode: status.OK,
       success: true,
       message: 'User is already registered but email is not verified. A verification OTP has been sent to your email.',
       data: {

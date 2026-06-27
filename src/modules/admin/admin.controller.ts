@@ -8,18 +8,28 @@ import status from 'http-status';
 const getVerificationsListAdmin = catchAsync(async (req: Request, res: Response) => {
   const { status: verifyStatus, search, page, limit } = req.query;
 
-  const result = await AdminService.getVerificationsListAdmin({
+  const result = await AdminService.getVerificationRequestsList({
     status: verifyStatus ? String(verifyStatus) : undefined,
     search: search ? String(search) : undefined,
     page: page ? Number(page) : undefined,
     limit: limit ? Number(limit) : undefined,
   });
 
-  sendResponse(res, {
-    statusCode: status.OK,
+  res.status(status.OK).json({
     success: true,
-    message: 'Dentist verifications list retrieved successfully.',
-    data: result,
+    data: result.data,
+    meta: {
+      total_verifications: result.status_counts.total_dentists,
+      pending_review: result.status_counts.pending_review,
+      fully_approved: result.status_counts.fully_approved,
+      rejected: result.status_counts.rejected,
+    },
+    pagination: {
+      page: result.meta.page,
+      limit: result.meta.limit,
+      totalPages: result.meta.totalPages,
+      totalItems: result.meta.total,
+    },
   });
 });
 
@@ -111,6 +121,104 @@ const updateVerificationWeights = catchAsync(async (req: Request, res: Response)
   });
 });
 
+const getVerificationRequestsList = catchAsync(async (req: Request, res: Response) => {
+  const { status: verifyStatus, search, page, limit } = req.query;
+
+  const result = await AdminService.getVerificationRequestsList({
+    status: verifyStatus ? String(verifyStatus) : undefined,
+    search: search ? String(search) : undefined,
+    page: page ? Number(page) : undefined,
+    limit: limit ? Number(limit) : undefined,
+  });
+
+  res.status(status.OK).json({
+    success: true,
+    data: result.data,
+    meta: {
+      total_verifications: result.status_counts.total_dentists,
+      pending_review: result.status_counts.pending_review,
+      fully_approved: result.status_counts.fully_approved,
+      rejected: result.status_counts.rejected,
+    },
+    pagination: {
+      page: result.meta.page,
+      limit: result.meta.limit,
+      totalPages: result.meta.totalPages,
+      totalItems: result.meta.total,
+    },
+  });
+});
+
+const approveLicensePost = catchAsync(async (req: Request, res: Response) => {
+  const dentistId = req.params.dentistId as string;
+  const result = await AdminService.verifyLicenseAdmin(dentistId, true, 'Approved by Admin');
+
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: 'License verification approved successfully.',
+    data: result,
+  });
+});
+
+const approveOperationsPost = catchAsync(async (req: Request, res: Response) => {
+  const dentistId = req.params.dentistId as string;
+  const result = await AdminService.verifyOperationsAdmin(dentistId, true, 'Approved by Admin');
+
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: 'Operations verification approved successfully.',
+    data: result,
+  });
+});
+
+const approveClinicDepthPost = catchAsync(async (req: Request, res: Response) => {
+  const dentistId = req.params.dentistId as string;
+  const result = await AdminService.verifyClinicDepthAdmin(dentistId, true, 'Approved by Admin');
+
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: 'Clinic depth verification approved successfully.',
+    data: result,
+  });
+});
+
+const getDentistVerificationPhases = catchAsync(async (req: Request, res: Response) => {
+  const dentistId = req.params.dentistId as string;
+  const result = await AdminService.getDentistVerificationPhases(dentistId);
+
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: 'Dentist verification phases retrieved successfully.',
+    data: result,
+  });
+});
+
+const verifyPhaseAdmin = catchAsync(async (req: Request, res: Response) => {
+  const dentistId = req.params.dentistId as string;
+  const { phase, isApproved, note } = req.body;
+
+  if (isApproved === false && (!note || typeof note !== 'string' || note.trim() === '')) {
+    throw new AppError(
+      status.BAD_REQUEST,
+      'A note containing the rejection reason is required when rejecting verification.',
+      'note',
+    );
+  }
+
+  const result = await AdminService.verifyPhaseAdmin(dentistId, phase, isApproved, note);
+
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: 'Verification phase updated successfully.',
+    data: result,
+  });
+});
+
 export const AdminController = {
   getVerificationsListAdmin,
   verifyLicenseAdmin,
@@ -118,4 +226,10 @@ export const AdminController = {
   verifyClinicDepthAdmin,
   getVerificationWeights,
   updateVerificationWeights,
+  getVerificationRequestsList,
+  approveLicensePost,
+  approveOperationsPost,
+  approveClinicDepthPost,
+  getDentistVerificationPhases,
+  verifyPhaseAdmin,
 };

@@ -1,14 +1,3 @@
-/*
-  Warnings:
-
-  - You are about to drop the column `procedure_id` on the `personalization_data` table. All the data in the column will be lost.
-  - You are about to drop the column `treatmentProcedureId` on the `personalization_data` table. All the data in the column will be lost.
-  - You are about to drop the `Patient` table. If the table is not empty, all the data it contains will be lost.
-  - You are about to drop the `procedure` table. If the table is not empty, all the data it contains will be lost.
-  - You are about to drop the `treatment_procedure` table. If the table is not empty, all the data it contains will be lost.
-  - Added the required column `global_procedure_id` to the `personalization_data` table without a default value. This is not possible if the table is not empty.
-
-*/
 -- CreateEnum
 CREATE TYPE "UserRole" AS ENUM ('ADMIN', 'PATIENT', 'DENTIST', 'SUPER_ADMIN');
 
@@ -22,7 +11,7 @@ CREATE TYPE "TreatmentStatus" AS ENUM ('DRAFT', 'PROPOSED', 'ACTIVE', 'COMPLETED
 CREATE TYPE "Gender" AS ENUM ('MALE', 'FEMALE', 'OTHER');
 
 -- CreateEnum
-CREATE TYPE "LicenseVerificationStatus" AS ENUM ('PENDING', 'VERIFIED', 'REJECTED');
+CREATE TYPE "VerificationStatus" AS ENUM ('PENDING', 'SUBMITTED', 'APPROVED', 'REJECTED');
 
 -- CreateEnum
 CREATE TYPE "LicenseVerifiedBy" AS ENUM ('ADMIN', 'SUPER_ADMIN', 'AUTHORITY', 'PLATFORM');
@@ -30,48 +19,8 @@ CREATE TYPE "LicenseVerifiedBy" AS ENUM ('ADMIN', 'SUPER_ADMIN', 'AUTHORITY', 'P
 -- CreateEnum
 CREATE TYPE "DentistVerificationPhase" AS ENUM ('LICENSE', 'OPERATIONS', 'CLINIC');
 
--- DropForeignKey
-ALTER TABLE "personalization_data" DROP CONSTRAINT "personalization_data_patient_id_fkey";
-
--- DropForeignKey
-ALTER TABLE "personalization_data" DROP CONSTRAINT "personalization_data_procedure_id_fkey";
-
--- DropForeignKey
-ALTER TABLE "personalization_data" DROP CONSTRAINT "personalization_data_treatmentProcedureId_fkey";
-
--- DropForeignKey
-ALTER TABLE "procedure" DROP CONSTRAINT "procedure_user_id_fkey";
-
--- AlterTable
-ALTER TABLE "personalization_data" DROP COLUMN "procedure_id",
-DROP COLUMN "treatmentProcedureId",
-ADD COLUMN     "budget" DECIMAL(10,2),
-ADD COLUMN     "global_procedure_id" TEXT NOT NULL,
-ADD COLUMN     "travel_end_date" DATE,
-ADD COLUMN     "travel_start_date" DATE,
-ALTER COLUMN "created_at" SET DATA TYPE TIMESTAMP(6),
-ALTER COLUMN "updated_at" SET DATA TYPE TIMESTAMP(6);
-
--- AlterTable
-ALTER TABLE "user" ADD COLUMN     "deletedAt" TIMESTAMP(3),
-ADD COLUMN     "first_name" VARCHAR(255),
-ADD COLUMN     "gender" "Gender",
-ADD COLUMN     "isDeleted" BOOLEAN NOT NULL DEFAULT false,
-ADD COLUMN     "last_name" VARCHAR(255),
-ADD COLUMN     "role" "UserRole" NOT NULL DEFAULT 'PATIENT',
-ADD COLUMN     "status" "UserStatus" NOT NULL DEFAULT 'ACTIVE',
-ADD COLUMN     "verifiedAt" TIMESTAMP(3),
-ALTER COLUMN "name" DROP NOT NULL,
-ALTER COLUMN "emailVerified" SET DEFAULT false;
-
--- DropTable
-DROP TABLE "Patient";
-
--- DropTable
-DROP TABLE "procedure";
-
--- DropTable
-DROP TABLE "treatment_procedure";
+-- CreateEnum
+CREATE TYPE "DentistVerificationRequestStatus" AS ENUM ('PENDING', 'SUBMITTED', 'APPROVED', 'REJECTED');
 
 -- CreateTable
 CREATE TABLE "admin" (
@@ -84,11 +33,93 @@ CREATE TABLE "admin" (
 );
 
 -- CreateTable
+CREATE TABLE "verificationRequests" (
+    "id" TEXT NOT NULL,
+    "dentistId" TEXT NOT NULL,
+    "verificationPhase" "DentistVerificationPhase" NOT NULL,
+    "status" "DentistVerificationRequestStatus" NOT NULL DEFAULT 'PENDING',
+    "isVerified" BOOLEAN NOT NULL DEFAULT false,
+    "verifiedAt" TIMESTAMP(3),
+    "verificationNote" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "verificationRequests_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "user" (
+    "id" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "first_name" VARCHAR(255),
+    "last_name" VARCHAR(255),
+    "name" TEXT,
+    "emailVerified" BOOLEAN NOT NULL DEFAULT false,
+    "verifiedAt" TIMESTAMP(3),
+    "image" TEXT,
+    "role" "UserRole" NOT NULL DEFAULT 'PATIENT',
+    "status" "UserStatus" NOT NULL DEFAULT 'ACTIVE',
+    "gender" "Gender",
+    "two_factor_enabled" BOOLEAN NOT NULL DEFAULT false,
+    "isDeleted" BOOLEAN NOT NULL DEFAULT false,
+    "deletedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "user_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "session" (
+    "id" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "token" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "ipAddress" TEXT,
+    "userAgent" TEXT,
+    "userId" TEXT NOT NULL,
+
+    CONSTRAINT "session_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "account" (
+    "id" TEXT NOT NULL,
+    "accountId" TEXT NOT NULL,
+    "providerId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "accessToken" TEXT,
+    "refreshToken" TEXT,
+    "idToken" TEXT,
+    "accessTokenExpiresAt" TIMESTAMP(3),
+    "refreshTokenExpiresAt" TIMESTAMP(3),
+    "scope" TEXT,
+    "password" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "account_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "verification" (
+    "id" TEXT NOT NULL,
+    "identifier" TEXT NOT NULL,
+    "value" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3),
+
+    CONSTRAINT "verification_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "dentists" (
     "id" TEXT NOT NULL,
     "user_id" TEXT NOT NULL,
     "phone_number" VARCHAR(25) NOT NULL,
-    "country" VARCHAR(100) NOT NULL,
+    "country" VARCHAR(100),
     "referral_code" VARCHAR(50),
     "specialty_id" TEXT,
     "created_at" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -129,7 +160,7 @@ CREATE TABLE "dentist_license" (
     "registration_authority" VARCHAR(255) NOT NULL,
     "registration_number" TEXT NOT NULL,
     "license_document" VARCHAR(255),
-    "verification_status" "LicenseVerificationStatus" NOT NULL DEFAULT 'PENDING',
+    "verification_status" "VerificationStatus" NOT NULL DEFAULT 'PENDING',
     "is_verified" BOOLEAN NOT NULL DEFAULT false,
     "verified_at" TIMESTAMP(6),
     "verified_by" "LicenseVerifiedBy" DEFAULT 'PLATFORM',
@@ -143,7 +174,7 @@ CREATE TABLE "dentist_license" (
 CREATE TABLE "dentist_license_verification" (
     "id" TEXT NOT NULL,
     "dentist_id" TEXT NOT NULL,
-    "verification_status" "LicenseVerificationStatus" NOT NULL DEFAULT 'PENDING',
+    "verification_status" "VerificationStatus" NOT NULL DEFAULT 'PENDING',
     "is_verified" BOOLEAN NOT NULL DEFAULT false,
     "verified_at" TIMESTAMP(6),
     "verified_by" "LicenseVerifiedBy" DEFAULT 'PLATFORM',
@@ -169,6 +200,8 @@ CREATE TABLE "dentist_operations_verification" (
     "verified_by" "LicenseVerifiedBy" DEFAULT 'PLATFORM',
     "verification_note" VARCHAR(255),
     "verification_request_note" VARCHAR(255),
+    "verification_status" "VerificationStatus" NOT NULL DEFAULT 'PENDING',
+    "is_approved" BOOLEAN NOT NULL DEFAULT false,
     "created_at" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(6) NOT NULL,
 
@@ -185,6 +218,8 @@ CREATE TABLE "dentist_clinic_depth_verification" (
     "verified_by" "LicenseVerifiedBy" DEFAULT 'PLATFORM',
     "verification_note" VARCHAR(255),
     "verification_request_note" VARCHAR(255),
+    "verification_status" "VerificationStatus" NOT NULL DEFAULT 'PENDING',
+    "is_approved" BOOLEAN NOT NULL DEFAULT false,
     "created_at" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(6) NOT NULL,
 
@@ -223,6 +258,18 @@ CREATE TABLE "dentist_verification_progress" (
 );
 
 -- CreateTable
+CREATE TABLE "verification_weights" (
+    "id" TEXT NOT NULL,
+    "license_weight" DOUBLE PRECISION NOT NULL DEFAULT 30,
+    "operations_weight" DOUBLE PRECISION NOT NULL DEFAULT 40,
+    "clinic_depth_weight" DOUBLE PRECISION NOT NULL DEFAULT 30,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "verification_weights_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "patient" (
     "id" TEXT NOT NULL,
     "user_id" TEXT NOT NULL,
@@ -233,6 +280,20 @@ CREATE TABLE "patient" (
     "updated_at" TIMESTAMP(6) NOT NULL,
 
     CONSTRAINT "patient_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "personalization_data" (
+    "id" TEXT NOT NULL,
+    "patient_id" TEXT NOT NULL,
+    "global_procedure_id" TEXT NOT NULL,
+    "budget" DECIMAL(10,2),
+    "travel_start_date" DATE,
+    "travel_end_date" DATE,
+    "created_at" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(6) NOT NULL,
+
+    CONSTRAINT "personalization_data_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -295,6 +356,18 @@ CREATE TABLE "treatment_line_item" (
 
 -- CreateIndex
 CREATE UNIQUE INDEX "admin_userId_key" ON "admin"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "verificationRequests_dentistId_key" ON "verificationRequests"("dentistId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "user_email_key" ON "user"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "session_token_key" ON "session"("token");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "account_providerId_accountId_key" ON "account"("providerId", "accountId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "dentists_user_id_key" ON "dentists"("user_id");
@@ -369,6 +442,15 @@ CREATE UNIQUE INDEX "patient_user_id_key" ON "patient"("user_id");
 CREATE INDEX "patient_user_id_idx" ON "patient"("user_id");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "personalization_data_patient_id_key" ON "personalization_data"("patient_id");
+
+-- CreateIndex
+CREATE INDEX "personalization_data_patient_id_idx" ON "personalization_data"("patient_id");
+
+-- CreateIndex
+CREATE INDEX "personalization_data_global_procedure_id_idx" ON "personalization_data"("global_procedure_id");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "global_procedure_name_key" ON "global_procedure"("name");
 
 -- CreateIndex
@@ -398,14 +480,17 @@ CREATE INDEX "treatment_line_item_treatment_plan_id_idx" ON "treatment_line_item
 -- CreateIndex
 CREATE INDEX "treatment_line_item_global_procedure_id_idx" ON "treatment_line_item"("global_procedure_id");
 
--- CreateIndex
-CREATE INDEX "personalization_data_patient_id_idx" ON "personalization_data"("patient_id");
-
--- CreateIndex
-CREATE INDEX "personalization_data_global_procedure_id_idx" ON "personalization_data"("global_procedure_id");
-
 -- AddForeignKey
 ALTER TABLE "admin" ADD CONSTRAINT "admin_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "verificationRequests" ADD CONSTRAINT "verificationRequests_dentistId_fkey" FOREIGN KEY ("dentistId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "session" ADD CONSTRAINT "session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "account" ADD CONSTRAINT "account_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "dentists" ADD CONSTRAINT "dentists_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
