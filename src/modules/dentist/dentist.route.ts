@@ -74,6 +74,12 @@ router.get(
   DentistController.getVerificationProgress,
 );
 
+router.get(
+  '/overview',
+  authMiddleware(UserRole.DENTIST),
+  DentistController.getOverviewData,
+);
+
 router.get("/profile", authMiddleware(UserRole.DENTIST), DentistController.dentistProfile)
 
 export const dentistRoutes = router;

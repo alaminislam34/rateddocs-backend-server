@@ -26,9 +26,10 @@ enum Gender {
   OTHER
 }
 
-enum LicenseVerificationStatus {
+enum VerificationStatus {
   PENDING
-  VERIFIED
+  SUBMITTED
+  APPROVED
   REJECTED
 }
 

@@ -4,7 +4,7 @@ import { auth } from '../../config/auth.js';
 import { generateAndSendOTP } from '../../shared/generateOtp.js';
 import {
   UserRole,
-  LicenseVerificationStatus,
+  VerificationStatus,
   DentistVerificationPhase,
   Prisma,
 } from '../../generated/prisma/index.js';
@@ -16,6 +16,7 @@ import {
   ISubmitLicense,
   ISubmitOperations,
   ISubmitClinicDepth,
+  IVerificationProgress,
 } from './dentist.interface.js';
 import { AppError } from '../../errors/AppError.js';
 
@@ -302,7 +303,7 @@ const submitLicense = async (
         registrationAuthority: payload.registrationAuthority,
         registrationNumber: payload.registrationNumber,
         licenseDocument: licenseDocumentUrl,
-        verificationStatus: LicenseVerificationStatus.PENDING,
+        verificationStatus: VerificationStatus.PENDING,
         isVerified: false,
       },
       create: {
@@ -312,7 +313,7 @@ const submitLicense = async (
         registrationAuthority: payload.registrationAuthority,
         registrationNumber: payload.registrationNumber,
         licenseDocument: licenseDocumentUrl,
-        verificationStatus: LicenseVerificationStatus.PENDING,
+        verificationStatus: VerificationStatus.PENDING,
         isVerified: false,
       },
     });
@@ -329,7 +330,7 @@ const submitLicense = async (
     await tx.dentistLicenseVerification.create({
       data: {
         dentistId: dentist.id,
-        verificationStatus: LicenseVerificationStatus.PENDING,
+        verificationStatus: VerificationStatus.PENDING,
         isVerified: false,
         verificationRequestNote:
           'Manual license document and profile picture submitted for review.',
@@ -506,14 +507,21 @@ const submitClinicDepth = async (userId: string, payload: ISubmitClinicDepth) =>
 /**
  * Retrieve current dentist verification progress and score
  */
-const getVerificationProgress = async (userId: string) => {
+const getVerificationProgress = async (userId: string): Promise<IVerificationProgress> => {
+  // 1. Fetch dentist with all related data
   const dentist = await prisma.dentist.findFirst({
     where: { userId },
     include: {
+      user: true,
       dentistLicense: true,
       dentistOperationsVerifications: true,
       dentistClinicDepthVerification: true,
       dentistVerificationProgress: true,
+      dentistProcedures: {
+        include: {
+          globalProcedure: true,
+        },
+      },
     },
   });
 
@@ -521,52 +529,84 @@ const getVerificationProgress = async (userId: string) => {
     throw new AppError(status.NOT_FOUND, 'Dentist profile not found');
   }
 
-  const dbProgress = dentist.dentistVerificationProgress;
+  // 2. Extract related data with proper null/array handling
+  // Note: Adjust based on your Prisma schema (one-to-one vs one-to-many)
+  const dbProgress = Array.isArray(dentist.dentistVerificationProgress)
+    ? dentist.dentistVerificationProgress[0] || null
+    : dentist.dentistVerificationProgress;
 
-  // 1. License status
-  let stepOneStatus = 'PENDING';
-  if (dbProgress?.isLicenseVerified || dentist.dentistLicense?.isVerified) {
-    stepOneStatus = 'APPROVED';
-  } else if (dentist.dentistLicense) {
-    const statusVal = dentist.dentistLicense.verificationStatus;
-    if (statusVal === 'VERIFIED') stepOneStatus = 'APPROVED';
-    else if (statusVal === 'REJECTED') stepOneStatus = 'REJECT';
-    else stepOneStatus = 'SUBMIT';
+  const depthVerification = Array.isArray(dentist.dentistClinicDepthVerification)
+    ? dentist.dentistClinicDepthVerification[0] || null
+    : dentist.dentistClinicDepthVerification;
+
+  const operationsVerification = dentist.dentistOperationsVerifications?.[0] || null;
+  const license = dentist.dentistLicense;
+
+  // 3. Calculate Step 1: License Status
+  let stepOneStatus: VerificationStatus = VerificationStatus.PENDING;
+
+  if (dbProgress?.isLicenseVerified) {
+    stepOneStatus = VerificationStatus.APPROVED;
+  } else if (license) {
+    const licenseStatus = license.verificationStatus;
+    if (licenseStatus === VerificationStatus.APPROVED) {
+      stepOneStatus = VerificationStatus.APPROVED;
+    } else if (licenseStatus === VerificationStatus.REJECTED) {
+      stepOneStatus = VerificationStatus.REJECTED;
+    } else {
+      stepOneStatus = VerificationStatus.SUBMITTED;
+    }
   }
 
-  // 2. Operations status
-  let stepTwoStatus = 'PENDING';
-  const ops = dentist.dentistOperationsVerifications[0] || null;
-  if (dbProgress?.isOperationsVerified || ops?.isVerified) {
-    stepTwoStatus = 'APPROVED';
-  } else if (ops) {
-    stepTwoStatus = 'SUBMIT';
+  // 4. Calculate Step 2: Operations Status
+  let stepTwoStatus: VerificationStatus = VerificationStatus.PENDING;
+
+  if (dbProgress?.isOperationsVerified || operationsVerification?.isVerified) {
+    stepTwoStatus = VerificationStatus.APPROVED;
+  } else if (operationsVerification) {
+    stepTwoStatus = VerificationStatus.SUBMITTED;
   }
 
-  // 3. Clinical depth status
-  let stepThreeStatus = 'PENDING';
-  const depth = dentist.dentistClinicDepthVerification;
-  if (dbProgress?.isClinicDepthVerified || depth?.isVerified) {
-    stepThreeStatus = 'APPROVED';
-  } else if (depth) {
-    stepThreeStatus = 'SUBMIT';
+  // 5. Calculate Step 3: Clinical Depth Status
+  let stepThreeStatus: VerificationStatus = VerificationStatus.PENDING;
+
+  if (dbProgress?.isClinicDepthVerified || depthVerification?.isVerified) {
+    stepThreeStatus = VerificationStatus.APPROVED;
+  } else if (depthVerification) {
+    stepThreeStatus = VerificationStatus.SUBMITTED;
   }
 
-  const isStepOneCompleted = stepOneStatus === 'APPROVED';
-  const isStepTwoCompleted = stepTwoStatus === 'APPROVED';
-  const isStepThreeCompleted = stepThreeStatus === 'APPROVED';
+  // 6. Calculate completion flags
+  const isStepOneCompleted = stepOneStatus === VerificationStatus.APPROVED;
+  const isStepTwoCompleted = stepTwoStatus === VerificationStatus.APPROVED;
+  const isStepThreeCompleted = stepThreeStatus === VerificationStatus.APPROVED;
 
+  // 7. Calculate progress percentage
   const progressPercentage =
     (isStepOneCompleted ? 30 : 0) +
     (isStepTwoCompleted ? 40 : 0) +
     (isStepThreeCompleted ? 30 : 0);
 
+  // 8. Build steps array
   const steps = [
-    { phase: 'LICENSE', completed: isStepOneCompleted, status: stepOneStatus },
-    { phase: 'OPERATIONAL', completed: isStepTwoCompleted, status: stepTwoStatus },
-    { phase: 'CLINICAL', completed: isStepThreeCompleted, status: stepThreeStatus },
+    {
+      phase: 'LICENSE',
+      completed: isStepOneCompleted,
+      status: stepOneStatus
+    },
+    {
+      phase: 'OPERATIONAL',
+      completed: isStepTwoCompleted,
+      status: stepTwoStatus
+    },
+    {
+      phase: 'CLINICAL',
+      completed: isStepThreeCompleted,
+      status: stepThreeStatus
+    },
   ];
 
+  // 9. Build response
   return {
     is_step_one_completed: isStepOneCompleted,
     is_step_two_completed: isStepTwoCompleted,
@@ -579,9 +619,33 @@ const getVerificationProgress = async (userId: string) => {
     progress_percentage: progressPercentage,
     score: progressPercentage,
     steps,
+    dentistLicense: license
+      ? {
+        country: license.country,
+        city: license.city,
+        registrationAuthority: license.registrationAuthority,
+        registrationNumber: license.registrationNumber,
+        licenseDocument: license.licenseDocument,
+        image: dentist.user?.image || null,
+      }
+      : null,
+    dentistOperations: operationsVerification
+      ? {
+          jciCertificate: operationsVerification.jciCertificate,
+          walkthroughVideo: operationsVerification.walkthroughVideo,
+          signerName: operationsVerification.signerName,
+          signature: operationsVerification.signature,
+          agreedToGuarantee: operationsVerification.agreedToGuarantee,
+        }
+      : null,
+    procedures: (dentist.dentistProcedures || []).map((dp) => ({
+      id: dp.id,
+      procedureName: dp.globalProcedure.name,
+      price: Number(dp.price),
+      notes: dp.notes,
+    })),
   };
 };
-
 const dentistProfile = async (userId: string) => {
   const dentist = await prisma.dentist.findUnique({
     where: { userId },
@@ -613,6 +677,209 @@ const dentistProfile = async (userId: string) => {
   return user;
 }
 
+const getOverviewData = async (userId: string) => {
+  const dentist = await prisma.dentist.findUnique({
+    where: { userId },
+    include: {
+      user: true,
+      dentistVerificationProgress: true,
+      treatmentPlans: {
+        include: {
+          patient: {
+            include: {
+              user: true,
+            },
+          },
+          lineItems: {
+            include: {
+              globalProcedure: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      },
+    },
+  });
+
+  if (!dentist) {
+    throw new AppError(status.NOT_FOUND, 'Dentist profile not found');
+  }
+
+  // 1. Process treatment plans
+  const mappedPlans = (dentist.treatmentPlans || []).map((tp) => {
+    const finalBudget = (tp.lineItems || []).reduce((sum, item) => {
+      const price = Number(item.unitPrice);
+      const qty = item.quantity || 1;
+      return sum + price * qty;
+    }, 0);
+
+    const firstProcedure = tp.lineItems?.[0]?.globalProcedure?.name || 'General Dental';
+
+    let displayStatus = 'Pending';
+    if (tp.status === 'ACTIVE') displayStatus = 'In Progress';
+    if (tp.status === 'COMPLETED') displayStatus = 'Completed';
+    if (tp.status === 'CANCELLED') displayStatus = 'Cancelled';
+
+    const travelDate = tp.createdAt.toISOString().split('T')[0];
+
+    return {
+      patient_info: {
+        name: tp.patient?.user?.name || 'Patient',
+        image: tp.patient?.user?.image || '',
+        treatment_plan: tp.status === 'ACTIVE' || tp.status === 'COMPLETED' ? 'accepted' : 'awaiting response',
+        email: tp.patient?.user?.email || `patient-${tp.patientId}@rateddocs.com`,
+        procedure: firstProcedure,
+        status: displayStatus,
+        payment_status: tp.status === 'COMPLETED' ? 'Paid' : 'Pending',
+        final_budget: finalBudget,
+      },
+      estimate_treatment_plan: {
+        estimate_amount_total: finalBudget,
+      },
+      final_treatment_plan: {
+        final_total: finalBudget,
+        status_tag: tp.status === 'COMPLETED' ? 'COMPLETED' : 'IN_PROGRESS',
+      },
+      patient_timeline: [
+        {
+          event: 'Inquiry',
+          date: travelDate,
+          details: 'Patient submitted initial treatment inquiry.',
+        },
+        {
+          event: 'Treatment Plan Created',
+          date: travelDate,
+          details: 'Treatment plan estimation has been generated.',
+        },
+      ],
+      payment_and_documents: {
+        attached_document: null,
+      },
+      review: null,
+    };
+  });
+
+  // 2. Separate cases/bookings
+  const activeBookings = mappedPlans.filter((p) => p.patient_info.status === 'In Progress').slice(0, 3);
+  const acceptedCases = mappedPlans.filter((p) => p.patient_info.treatment_plan === 'accepted');
+  const completedCases = mappedPlans.filter((p) => p.patient_info.status === 'Completed');
+  const pendingCases = mappedPlans.filter((p) => p.patient_info.status === 'Pending');
+  const cancelledCases = mappedPlans.filter((p) => p.patient_info.status === 'Cancelled');
+
+  const monthlyRevenue = [...acceptedCases, ...completedCases].reduce(
+    (sum, p) => sum + p.patient_info.final_budget,
+    0,
+  );
+
+  const verifiedRate = dentist.dentistVerificationProgress?.rvdScore || 0;
+  const estimateAccuracy = completedCases.length > 0 ? 100 : 0;
+  const disputeRate = mappedPlans.length > 0 ? Math.round((cancelledCases.length / mappedPlans.length) * 100) : 0;
+
+  // 3. Alerts
+  const alerts = [];
+  if (pendingCases.length > 0) {
+    alerts.push({
+      label: 'New booking request',
+      detail: `${pendingCases[0].patient_info.name} is interested in ${pendingCases[0].patient_info.procedure}. Respond within 24 hours.`,
+    });
+  } else {
+    alerts.push({
+      label: 'Booking Request',
+      detail: 'No pending booking requests. Ensure your procedures list is updated.',
+    });
+  }
+
+  alerts.push({
+    label: 'Profile Status',
+    detail: dentist.dentistVerificationProgress?.isClinicDepthVerified
+      ? 'Verification complete! Your profile is now live.'
+      : 'Complete your verification phases to receive active bookings.',
+  });
+
+  const referralSummary = [
+    { label: 'Verified cases', value: acceptedCases.length + completedCases.length },
+    { label: 'Pending replies', value: pendingCases.length },
+    { label: 'Cancelled cases', value: cancelledCases.length },
+  ];
+
+  const referralCode = dentist.referralCode || `RD-DR-${dentist.id.substring(0, 6).toUpperCase()}`;
+
+  return {
+    stats: [
+      {
+        label: 'Active bookings',
+        value: activeBookings.length,
+        subLabel: activeBookings.length > 0 ? 'Currently in progress' : 'No active bookings',
+        trend: activeBookings.length > 0 ? 'positive' : 'neutral',
+        icon: 'calendar',
+        accent: 'Active bookings',
+      },
+      {
+        label: 'Pending estimates',
+        value: pendingCases.length,
+        subLabel: pendingCases.length > 0 ? 'Needs response' : 'All caught up',
+        trend: pendingCases.length > 0 ? 'negative' : 'neutral',
+        icon: 'clock',
+        accent: 'Pending estimates',
+        highlight: pendingCases.length > 0,
+      },
+      {
+        label: 'Monthly revenue',
+        value: `$${monthlyRevenue.toLocaleString()}`,
+        subLabel: monthlyRevenue > 0 ? 'Based on accepted/completed plans' : 'No revenue yet',
+        trend: monthlyRevenue > 0 ? 'positive' : 'neutral',
+        icon: 'dollar',
+        accent: 'Monthly revenue',
+      },
+      {
+        label: 'Estimate accuracy rate',
+        value: `${estimateAccuracy}%`,
+        subLabel: completedCases.length > 0 ? 'Based on completed treatment plans' : 'No completed cases yet',
+        trend: estimateAccuracy > 0 ? 'positive' : 'neutral',
+        icon: 'target',
+        accent: 'Estimate accuracy rate',
+      },
+    ],
+    chart: {
+      score: verifiedRate,
+      completed: acceptedCases.length + completedCases.length,
+      total: mappedPlans.length,
+      labels: [
+        {
+          label: 'Booking completion rate',
+          value: `${verifiedRate}%`,
+          badge: verifiedRate > 75 ? 'Excellent' : 'Normal',
+          badgeColor: 'success',
+        },
+        {
+          label: 'Dispute rate',
+          value: `${disputeRate}%`,
+          badge: disputeRate === 0 ? 'Clean' : 'Normal',
+          badgeColor: 'success',
+        },
+        {
+          label: 'Estimate accuracy',
+          value: `${estimateAccuracy}%`,
+          badge: estimateAccuracy > 75 ? 'High' : 'Normal',
+          badgeColor: 'sky',
+        },
+        {
+          label: 'Profile freshness',
+          value: 'Updated recently',
+          badge: 'Fresh',
+          badgeColor: 'success',
+        },
+      ],
+    },
+    alerts,
+    activeBookings,
+    referralSummary,
+    referralCode,
+  };
+};
+
 export const DentistService = {
   dentistProfile,
   registerDentist,
@@ -622,4 +889,5 @@ export const DentistService = {
   submitOperations,
   submitClinicDepth,
   getVerificationProgress,
+  getOverviewData,
 };

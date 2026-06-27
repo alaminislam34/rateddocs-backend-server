@@ -187,6 +187,22 @@ const dentistProfile = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getOverviewData = catchAsync(async (req: Request, res: Response) => {
+  const user = req.user;
+  if (!user) {
+    throw new AppError(status.UNAUTHORIZED, 'Unauthorized: User session not found');
+  }
+
+  const result = await DentistService.getOverviewData(user.id);
+
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: 'Dentist overview data retrieved successfully.',
+    data: result,
+  });
+});
+
 export const DentistController = {
   registerDentist,
   submitProfessionalData,
@@ -195,5 +211,6 @@ export const DentistController = {
   submitOperations,
   submitClinicDepth,
   getVerificationProgress,
-  dentistProfile
+  dentistProfile,
+  getOverviewData,
 };

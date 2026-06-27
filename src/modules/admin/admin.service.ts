@@ -2,7 +2,7 @@ import status from 'http-status';
 import { prisma } from '../../config/db.js';
 import { AppError } from '../../errors/AppError.js';
 import {
-  LicenseVerificationStatus,
+  VerificationStatus,
   DentistVerificationPhase,
   Prisma,
 } from '../../generated/prisma/index.js';
@@ -44,28 +44,28 @@ const getVerificationsListAdmin = async (query: {
   const whereConditions: Prisma.DentistWhereInput = {
     ...(query.status
       ? {
-          dentistLicense: {
-            verificationStatus: query.status as LicenseVerificationStatus,
-          },
-        }
+        dentistLicense: {
+          verificationStatus: query.status as VerificationStatus,
+        },
+      }
       : {}),
     ...(query.search
       ? {
-          OR: [
-            {
-              user: {
-                OR: [
-                  { firstName: { contains: query.search, mode: 'insensitive' } },
-                  { lastName: { contains: query.search, mode: 'insensitive' } },
-                  { email: { contains: query.search, mode: 'insensitive' } },
-                ],
-              },
+        OR: [
+          {
+            user: {
+              OR: [
+                { firstName: { contains: query.search, mode: 'insensitive' } },
+                { lastName: { contains: query.search, mode: 'insensitive' } },
+                { email: { contains: query.search, mode: 'insensitive' } },
+              ],
             },
-            {
-              phoneNumber: { contains: query.search },
-            },
-          ],
-        }
+          },
+          {
+            phoneNumber: { contains: query.search },
+          },
+        ],
+      }
       : {}),
   };
 
@@ -122,8 +122,8 @@ const verifyLicenseAdmin = async (dentistId: string, isApproved: boolean, note?:
 
   await prisma.$transaction(async (tx) => {
     const statusVal = isApproved
-      ? LicenseVerificationStatus.VERIFIED
-      : LicenseVerificationStatus.REJECTED;
+      ? VerificationStatus.APPROVED
+      : VerificationStatus.REJECTED;
 
     await tx.dentistLicense.update({
       where: { dentistId },
