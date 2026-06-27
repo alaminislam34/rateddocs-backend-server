@@ -9,7 +9,6 @@ export const registerDentistSchema = z.object({
       email: z.string().min(1, 'Email is required').email('Invalid email address'),
       phoneNumber: z.string().min(1, 'Phone number is required'),
       gender: z.nativeEnum(Gender),
-      country: z.string().min(1, 'Country is required'),
       referralCode: z.string().optional(),
       password: z.string().min(8, 'Password must be at least 8 characters long'),
       confirmPassword: z.string().min(1, 'Confirm password is required'),

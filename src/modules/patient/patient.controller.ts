@@ -2,8 +2,8 @@ import { Request, Response } from 'express';
 import { catchAsync } from '../../shared/catchAsync.js';
 import { sendResponse } from '../../shared/sendResponse.js';
 import { PatientService } from './patient.service.js';
-import { AppError } from '../../errors/AppError.js';
 import status from 'http-status';
+import { AppError } from '../../errors/AppError.js';
 
 const PersonalizeData = catchAsync(async (req: Request, res: Response) => {
     const user = req.user;

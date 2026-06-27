@@ -1,4 +1,5 @@
 import { JwtPayload, SignOptions } from "jsonwebtoken";
+import crypto from "crypto";
 import { jwtUtils } from "./jwt.js";
 import { cookieUtils } from "./cookie.js";
 import { Response } from "express";
@@ -9,7 +10,7 @@ const isProduction = envVars.NODE_ENV === "production";
 const commonCookieOptions = {
   httpOnly: true,
   secure: isProduction,
-  sameSite: (isProduction ? "none" : "strict") as "none" | "strict",
+  sameSite: (isProduction ? "none" : "lax") as "none" | "lax",
 };
 
 const getAccessToken = (payload: JwtPayload) => {
@@ -46,7 +47,14 @@ const setRefreshTokenCookie = (res: Response, token: string) => {
 };
 
 const setBetterAuthSessionTokenCookie = (res: Response, token: string) => {
-  cookieUtils.setCookie(res, "better-auth.session_token", token, {
+  const secret = envVars.BETTER_AUTH_SECRET as string;
+  const signature = crypto
+    .createHmac("sha256", secret)
+    .update(token)
+    .digest("base64");
+  const signedToken = `${token}.${signature}`;
+
+  cookieUtils.setCookie(res, "better-auth.session_token", signedToken, {
     ...commonCookieOptions,
     // 1 days
     maxAge: 24 * 60 * 60 * 1000,

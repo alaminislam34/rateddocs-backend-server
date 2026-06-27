@@ -2,8 +2,8 @@ import { Request, Response } from 'express';
 import { catchAsync } from '../../shared/catchAsync.js';
 import { sendResponse } from '../../shared/sendResponse.js';
 import { ProcedureService } from './procedure.service.js';
-import { AppError } from '../../errors/AppError.js';
 import status from 'http-status';
+import { AppError } from '../../errors/AppError.js';
 
 const getGlobalProcedures = catchAsync(async (req: Request, res: Response) => {
   const { search } = req.query;

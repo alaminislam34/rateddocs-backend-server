@@ -10,6 +10,8 @@ const createToken = (
 };
 
 const verifyToken = (token: string, secret: string): JwtPayload => {
+  console.log("token", token);
+  console.log("secret", secret);
   try {
     const decoded = jwt.verify(token, secret) as JwtPayload;
     return {

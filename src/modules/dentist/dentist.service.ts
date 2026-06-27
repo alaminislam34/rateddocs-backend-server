@@ -1,6 +1,5 @@
 import status from 'http-status';
 import { prisma } from '../../config/db.js';
-import { AppError } from '../../errors/AppError.js';
 import { auth } from '../../config/auth.js';
 import { generateAndSendOTP } from '../../shared/generateOtp.js';
 import {
@@ -18,6 +17,7 @@ import {
   ISubmitOperations,
   ISubmitClinicDepth,
 } from './dentist.interface.js';
+import { AppError } from '../../errors/AppError.js';
 
 /**
  * Converts a free-text procedure name to a URL-friendly slug.
@@ -91,7 +91,7 @@ const registerDentist = async (
   headers: Headers,
   headshotFile?: Express.Multer.File,
 ) => {
-  const { firstName, lastName, email, phoneNumber, gender, country, referralCode, password } =
+  const { firstName, lastName, email, phoneNumber, gender, referralCode, password } =
     payload;
 
   const existingUser = await prisma.user.findUnique({
@@ -100,10 +100,7 @@ const registerDentist = async (
 
   if (existingUser) {
     if (existingUser.emailVerified) {
-      return {
-        needEmailVerify: true,
-        email,
-      };
+      throw new AppError(status.CONFLICT, 'User with this email already exists.', 'email');
     }
     // Generate and send verification OTP
     const name = `${firstName} ${lastName}`;
@@ -154,7 +151,6 @@ const registerDentist = async (
       data: {
         userId,
         phoneNumber,
-        country,
         referralCode,
       },
     });
@@ -511,23 +507,114 @@ const submitClinicDepth = async (userId: string, payload: ISubmitClinicDepth) =>
  * Retrieve current dentist verification progress and score
  */
 const getVerificationProgress = async (userId: string) => {
-  const dentist = await prisma.dentist.findUnique({
+  const dentist = await prisma.dentist.findFirst({
     where: { userId },
+    include: {
+      dentistLicense: true,
+      dentistOperationsVerifications: true,
+      dentistClinicDepthVerification: true,
+      dentistVerificationProgress: true,
+    },
   });
 
   if (!dentist) {
     throw new AppError(status.NOT_FOUND, 'Dentist profile not found');
   }
 
-  const progress = await prisma.dentistVerificationProgress.findUnique({
-    where: { dentistId: dentist.id },
-  });
+  const dbProgress = dentist.dentistVerificationProgress;
 
-  return progress;
+  // 1. License status
+  let stepOneStatus = 'PENDING';
+  if (dbProgress?.isLicenseVerified || dentist.dentistLicense?.isVerified) {
+    stepOneStatus = 'APPROVED';
+  } else if (dentist.dentistLicense) {
+    const statusVal = dentist.dentistLicense.verificationStatus;
+    if (statusVal === 'VERIFIED') stepOneStatus = 'APPROVED';
+    else if (statusVal === 'REJECTED') stepOneStatus = 'REJECT';
+    else stepOneStatus = 'SUBMIT';
+  }
+
+  // 2. Operations status
+  let stepTwoStatus = 'PENDING';
+  const ops = dentist.dentistOperationsVerifications[0] || null;
+  if (dbProgress?.isOperationsVerified || ops?.isVerified) {
+    stepTwoStatus = 'APPROVED';
+  } else if (ops) {
+    stepTwoStatus = 'SUBMIT';
+  }
+
+  // 3. Clinical depth status
+  let stepThreeStatus = 'PENDING';
+  const depth = dentist.dentistClinicDepthVerification;
+  if (dbProgress?.isClinicDepthVerified || depth?.isVerified) {
+    stepThreeStatus = 'APPROVED';
+  } else if (depth) {
+    stepThreeStatus = 'SUBMIT';
+  }
+
+  const isStepOneCompleted = stepOneStatus === 'APPROVED';
+  const isStepTwoCompleted = stepTwoStatus === 'APPROVED';
+  const isStepThreeCompleted = stepThreeStatus === 'APPROVED';
+
+  const progressPercentage =
+    (isStepOneCompleted ? 30 : 0) +
+    (isStepTwoCompleted ? 40 : 0) +
+    (isStepThreeCompleted ? 30 : 0);
+
+  const steps = [
+    { phase: 'LICENSE', completed: isStepOneCompleted, status: stepOneStatus },
+    { phase: 'OPERATIONAL', completed: isStepTwoCompleted, status: stepTwoStatus },
+    { phase: 'CLINICAL', completed: isStepThreeCompleted, status: stepThreeStatus },
+  ];
+
+  return {
+    is_step_one_completed: isStepOneCompleted,
+    is_step_two_completed: isStepTwoCompleted,
+    is_step_three_completed: isStepThreeCompleted,
+    step_one_status: stepOneStatus,
+    step_two_status: stepTwoStatus,
+    step_three_status: stepThreeStatus,
+    is_verified: isStepOneCompleted && isStepTwoCompleted && isStepThreeCompleted,
+    verification_phase: dbProgress?.currentPhase || 'LICENSE',
+    progress_percentage: progressPercentage,
+    score: progressPercentage,
+    steps,
+  };
 };
 
+const dentistProfile = async (userId: string) => {
+  const dentist = await prisma.dentist.findUnique({
+    where: { userId },
+  });
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      dentist: {
+        include: {
+          user: true,
+          dentistClinicDepthVerification: true,
+          dentistLicense: true,
+          dentistLicenseVerifications: true,
+          dentistOperationsVerifications: true,
+          specialty: true,
+          dentistProcedures: true,
+          dentistProfessionalData: true,
+          treatmentPlans: true
+        }
+      }
+    }
+  });
+
+  if (!user) {
+    throw new AppError(status.NOT_FOUND, 'User profile not found');
+  }
+
+  return user;
+}
 
 export const DentistService = {
+  dentistProfile,
   registerDentist,
   submitProfessionalData,
   checkLicenseRegistry,

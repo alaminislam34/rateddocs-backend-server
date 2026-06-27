@@ -9,6 +9,8 @@ import { LoginPayload } from './auth.interface.js';
 import { IsExistUser } from '../../shared/IsExistUser.js';
 import { generateAndSendOTP } from '../../shared/generateOtp.js';
 import { tokenUtils } from '../../utils/token.js';
+import { buildAuthRequest } from '../../utils/buildAuthRequest.js';
+import { getAuthHeaders } from '../../utils/getAuthHeader.js';
 
 export const verifyUserRoleAndGet = async (email: string, role: UserRole[]) => {
   return await IsExistUser(email, role);
@@ -48,7 +50,10 @@ const registerPatient = async (
     try {
       const name = existingUser.firstName || existingUser.name || email.split('@')[0];
       await generateAndSendOTP(email, name);
-      return;
+      return {
+        needEmailVerify: true,
+        email,
+      };
     } catch (error: unknown) {
       throw new AppError(
         status.INTERNAL_SERVER_ERROR,
@@ -89,7 +94,7 @@ const registerPatient = async (
 };
 
 const verifyEmailOtp = async (email: string, otp: string) => {
-  // Find the latest OTP verification record
+  // 1. Validate the custom OTP from the Verification table
   const verification = await prisma.verification.findFirst({
     where: {
       identifier: `otp:${email}`,
@@ -106,7 +111,7 @@ const verifyEmailOtp = async (email: string, otp: string) => {
     throw new AppError(status.BAD_REQUEST, 'OTP has expired', 'otp');
   }
 
-  // Get corresponding user
+  // 2. Get corresponding user
   const user = await prisma.user.findUnique({
     where: { email },
     include: { patient: true },
@@ -116,7 +121,7 @@ const verifyEmailOtp = async (email: string, otp: string) => {
     throw new AppError(status.NOT_FOUND, 'User not found', 'email');
   }
 
-  // Execute status update and profile creation inside transaction
+  // 3. Execute status update and profile creation inside transaction
   await prisma.$transaction(async (tx) => {
     await tx.user.update({
       where: { id: user.id },
@@ -141,14 +146,14 @@ const verifyEmailOtp = async (email: string, otp: string) => {
     });
   });
 
-  // Send welcome email
+  // 4. Send welcome email
   const name = user.firstName || user.name || email.split('@')[0];
   await sendEmail(email, 'Welcome to RatedDocs!', 'welcome', {
     name,
     dashboardUrl: `${envVars.FRONTEND_URL}/`,
   });
 
-  // Create active session in Better-Auth
+  // 5. Create active session in Better-Auth
   const authCtx = await (
     auth as {
       $context: Promise<{
@@ -166,13 +171,14 @@ const verifyEmailOtp = async (email: string, otp: string) => {
 
   const session = await authCtx.internalAdapter.createSession(user.id);
 
+  // 6. Generate access and refresh tokens
   const accessToken = tokenUtils.getAccessToken({
     userId: user.id,
     role: user.role,
     name: user.name,
     email: user.email,
-    status: user.status,
-    emailVerified: user.emailVerified,
+    status: 'ACTIVE',
+    emailVerified: true,
   });
 
   const refreshToken = tokenUtils.getRefreshToken({
@@ -180,8 +186,8 @@ const verifyEmailOtp = async (email: string, otp: string) => {
     role: user.role,
     name: user.name,
     email: user.email,
-    status: user.status,
-    emailVerified: user.emailVerified,
+    status: 'ACTIVE',
+    emailVerified: true,
   });
 
   return {
@@ -463,15 +469,35 @@ const getSession = async (
   incomingUserAgent?: string,
   incomingIp?: string,
 ) => {
-  const result = await auth.api.getSession({
-    headers: clientHeaders,
-  });
-
-  if (!result) {
+  const cookieHeader = clientHeaders.get('cookie') || '';
+  const match = cookieHeader.match(/better-auth\.session_token=([^;]+)/);
+  if (!match) {
     return null;
   }
 
-  const { session } = result;
+  const rawCookieVal = match[1];
+  const decodedCookieVal = decodeURIComponent(rawCookieVal);
+  // Split by '.' to get the raw session token (since Better-Auth cookies are in the format token.signature)
+  const token = decodedCookieVal.split('.')[0];
+
+  const session = await prisma.session.findUnique({
+    where: { token },
+    include: {
+      user: true,
+    },
+  });
+
+  if (!session) {
+    return null;
+  }
+
+  // Check if session has expired
+  if (session.expiresAt < new Date()) {
+    await prisma.session.delete({
+      where: { id: session.id },
+    }).catch(() => {});
+    return null;
+  }
 
   // 1. Verify User-Agent
   if (session.userAgent && incomingUserAgent && session.userAgent !== incomingUserAgent) {
@@ -507,25 +533,26 @@ const getSession = async (
   }
 
   const accessToken = tokenUtils.getAccessToken({
-    userId: result.user.id,
-    role: result.user.role,
-    name: result.user.name,
-    email: result.user.email,
-    status: result.user.status,
-    emailVerified: result.user.emailVerified,
+    userId: session.user.id,
+    role: session.user.role,
+    name: session.user.name,
+    email: session.user.email,
+    status: session.user.status,
+    emailVerified: session.user.emailVerified,
   });
 
   const refreshToken = tokenUtils.getRefreshToken({
-    userId: result.user.id,
-    role: result.user.role,
-    name: result.user.name,
-    email: result.user.email,
-    status: result.user.status,
-    emailVerified: result.user.emailVerified,
+    userId: session.user.id,
+    role: session.user.role,
+    name: session.user.name,
+    email: session.user.email,
+    status: session.user.status,
+    emailVerified: session.user.emailVerified,
   });
 
   return {
-    ...result,
+    session,
+    user: session.user,
     accessToken,
     refreshToken,
   };

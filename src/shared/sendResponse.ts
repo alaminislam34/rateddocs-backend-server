@@ -1,16 +1,23 @@
-import { Response } from 'express';
+import { Response } from "express";
 
-type TResponse<T> = {
+interface IResponse<T> {
   statusCode: number;
   success: boolean;
-  message?: string;
-  data: T;
-};
+  message: string;
+  data?: T;
+  meta?: Record<string, unknown>;
+}
 
-export const sendResponse = <T>(res: Response, data: TResponse<T>) => {
-  res.status(data.statusCode).json({
-    success: data.success,
-    message: data.message,
-    data: data.data,
+export const sendResponse = async <T>(
+  res: Response,
+  responseData: IResponse<T>,
+) => {
+  const { statusCode, success, message, data, meta } = responseData;
+  res.status(statusCode).json({
+    statusCode,
+    success,
+    message,
+    data,
+    ...(meta ? { meta } : {}),
   });
 };

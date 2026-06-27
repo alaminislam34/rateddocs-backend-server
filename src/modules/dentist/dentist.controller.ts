@@ -2,9 +2,9 @@ import { Request, Response } from 'express';
 import { catchAsync } from '../../shared/catchAsync.js';
 import { sendResponse } from '../../shared/sendResponse.js';
 import { fromNodeHeaders } from 'better-auth/node';
-import { AppError } from '../../errors/AppError.js';
 import status from 'http-status';
 import { DentistService } from './dentist.service.js';
+import { AppError } from '../../errors/AppError.js';
 
 /**
  * Register Dentist profile.
@@ -171,6 +171,22 @@ const getVerificationProgress = catchAsync(async (req: Request, res: Response) =
   });
 });
 
+const dentistProfile = catchAsync(async (req: Request, res: Response) => {
+  const user = req.user;
+  if (!user) {
+    throw new AppError(status.UNAUTHORIZED, 'Unauthorized: User session not found');
+  }
+
+  const result = await DentistService.dentistProfile(user.id);
+
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: 'Dentist profile retrieved successfully.',
+    data: result,
+  });
+});
+
 export const DentistController = {
   registerDentist,
   submitProfessionalData,
@@ -179,4 +195,5 @@ export const DentistController = {
   submitOperations,
   submitClinicDepth,
   getVerificationProgress,
+  dentistProfile
 };

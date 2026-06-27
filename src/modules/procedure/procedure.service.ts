@@ -1,8 +1,8 @@
 import status from 'http-status';
 import { prisma } from '../../config/db.js';
-import { AppError } from '../../errors/AppError.js';
 import { ICreateDentistProcedure } from './procedure.interface.js';
 import { Prisma } from '../../generated/prisma/index.js';
+import { AppError } from '../../errors/AppError.js';
 
 const toSlug = (name: string): string =>
   name
@@ -15,12 +15,12 @@ const toSlug = (name: string): string =>
 const getGlobalProcedures = async (query: { search?: string }) => {
   const whereConditions: Prisma.GlobalProcedureWhereInput = query.search
     ? {
-        OR: [
-          { name: { contains: query.search, mode: 'insensitive' as Prisma.QueryMode } },
-          { slug: { contains: toSlug(query.search), mode: 'insensitive' as Prisma.QueryMode } },
-        ],
-        isDeleted: false,
-      }
+      OR: [
+        { name: { contains: query.search, mode: 'insensitive' as Prisma.QueryMode } },
+        { slug: { contains: toSlug(query.search), mode: 'insensitive' as Prisma.QueryMode } },
+      ],
+      isDeleted: false,
+    }
     : { isDeleted: false };
 
   return prisma.globalProcedure.findMany({

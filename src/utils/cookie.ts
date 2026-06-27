@@ -9,8 +9,8 @@ const setCookie = (
   res.cookie(key, value, options);
 };
 
-const getCookie = (rep: Request, key: string) => {
-  return rep.cookies[key];
+const getCookie = (req: Request, key: string) => {
+  return req.cookies[key];
 };
 
 const clearCookie = (res: Response, key: string, options?: CookieOptions) => {

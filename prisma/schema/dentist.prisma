@@ -3,7 +3,7 @@ model Dentist {
   userId       String     @unique @map("user_id")
   user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   phoneNumber  String     @map("phone_number") @db.VarChar(25)
-  country      String     @db.VarChar(100)
+  country      String?    @db.VarChar(100)
   referralCode String?    @unique @map("referral_code") @db.VarChar(50)
   specialtyId  String?    @map("specialty_id")
   specialty    Specialty? @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
@@ -174,12 +174,12 @@ model DentistVerificationProgress {
 }
 
 model VerificationWeight {
-  id                    String   @id @default(cuid())
-  licenseWeight         Float    @default(30) @map("license_weight")
-  operationsWeight      Float    @default(40) @map("operations_weight")
-  clinicDepthWeight     Float    @default(30) @map("clinic_depth_weight")
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
+  id                String   @id @default(cuid())
+  licenseWeight     Float    @default(30) @map("license_weight")
+  operationsWeight  Float    @default(40) @map("operations_weight")
+  clinicDepthWeight Float    @default(30) @map("clinic_depth_weight")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
 
   @@map("verification_weights")
 }

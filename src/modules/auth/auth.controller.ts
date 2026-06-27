@@ -177,7 +177,6 @@ const logout = catchAsync(async (req: Request, res: Response) => {
   await AuthService.logout(clientHeaders);
 
   // Clear Better-Auth session cookies
-  res.clearCookie('better-auth.session-token', { path: '/' });
   res.clearCookie('better-auth.session_token', { path: '/' });
 
   // Clear JWT access and refresh token cookies

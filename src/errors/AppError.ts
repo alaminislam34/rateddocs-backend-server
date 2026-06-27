@@ -1,16 +1,22 @@
 export class AppError extends Error {
-  public statusCode: number;
-  public isOperational: boolean;
-  public path?: string;
+  public readonly statusCode: number;
+  public readonly isOperational: boolean;
+  public readonly errorCode?: string;
+  public readonly path?: string;
 
-  constructor(statusCode: number, message: string, path?: string, stack = '') {
+  constructor(
+    statusCode: number,
+    message: string,
+    stack?: string,
+    isOperational = true,
+    errorCode?: string,
+    path?: string,
+  ) {
     super(message);
     this.statusCode = statusCode;
-    this.isOperational = true;
-
-    if (path) {
-      this.path = path;
-    }
+    this.isOperational = isOperational;
+    this.errorCode = errorCode;
+    this.path = path;
 
     if (stack) {
       this.stack = stack;

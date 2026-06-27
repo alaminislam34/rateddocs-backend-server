@@ -74,4 +74,6 @@ router.get(
   DentistController.getVerificationProgress,
 );
 
+router.get("/profile", authMiddleware(UserRole.DENTIST), DentistController.dentistProfile)
+
 export const dentistRoutes = router;
