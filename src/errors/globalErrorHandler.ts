@@ -1,5 +1,5 @@
 import { ErrorRequestHandler } from 'express';
-import { env } from '../config/env.js';
+import { envVars } from '../config/env.js';
 import { ZodError } from 'zod';
 import status from 'http-status';
 import { handleZodError } from './handleZodError.js';
@@ -51,23 +51,24 @@ export const globalErrorHandler: ErrorRequestHandler = (err, req, res, next) => 
     errors = simplifiedError.errorSources;
   }
   // 4. Fallback for non-operational/internal errors in production
-  else if (env.NODE_ENV === 'production' && !err.isOperational) {
+  else if (envVars.NODE_ENV === 'production' && !err.isOperational) {
     message = 'An unexpected internal server error occurred.';
   }
 
   // Format error sources list into field-message pairs for Client Response
-  const formattedErrors = errors.length > 0 
-    ? errors.map((source) => ({
+  const formattedErrors =
+    errors.length > 0
+      ? errors.map((source) => ({
         field: String(source.path),
         message: source.message,
       }))
-    : undefined;
+      : undefined;
 
   const response: CustomErrorResponse = {
     success: false,
     message,
     ...(formattedErrors && { errors: formattedErrors }),
-    ...(env.NODE_ENV === 'development' && {
+    ...(envVars.NODE_ENV === 'development' && {
       errorDetails,
       stack: err.stack,
     }),

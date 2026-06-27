@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { catchAsync } from '../../utils/catchAsync.js';
-import { sendResponse } from '../../utils/sendResponse.js';
+import { catchAsync } from '../../shared/catchAsync.js';
+import { sendResponse } from '../../shared/sendResponse.js';
 import * as userService from './user.service.js';
 import { AppError } from '../../errors/AppError.js';
 

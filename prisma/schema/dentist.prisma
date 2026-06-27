@@ -3,7 +3,7 @@ model Dentist {
   userId       String     @unique @map("user_id")
   user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   phoneNumber  String     @map("phone_number") @db.VarChar(25)
-  country      String     @db.VarChar(100)
+  country      String?    @db.VarChar(100)
   referralCode String?    @unique @map("referral_code") @db.VarChar(50)
   specialtyId  String?    @map("specialty_id")
   specialty    Specialty? @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
@@ -27,10 +27,12 @@ model Dentist {
 }
 
 model DentistProfessionalData {
-  id        String  @id @default(cuid())
-  dentistId String  @unique @map("dentist_id")
-  dentist   Dentist @relation(fields: [dentistId], references: [id], onDelete: Cascade)
-  legalName String  @map("legal_name") @db.VarChar(255)
+  id                String  @id @default(cuid())
+  dentistId         String  @unique @map("dentist_id")
+  dentist           Dentist @relation(fields: [dentistId], references: [id], onDelete: Cascade)
+  legalName         String  @map("legal_name") @db.VarChar(255)
+  yearsOfExperience Int?    @map("years_of_experience")
+  city              String  @db.VarChar(100)
 
   @@index([dentistId])
   @@map("dentist_professional_data")
@@ -51,18 +53,18 @@ model Specialty {
 }
 
 model DentistLicense {
-  id                    String                    @id @default(uuid(7))
-  dentistId             String                    @unique @map("dentist_id")
-  dentist               Dentist                   @relation(fields: [dentistId], references: [id], onDelete: Cascade)
-  country               String                    @db.VarChar(100)
-  city                  String                    @db.VarChar(100)
-  registrationAuthority String                    @map("registration_authority") @db.VarChar(255)
-  registrationNumber    String                    @unique @map("registration_number")
-  licenseDocument       String?                   @map("license_document") @db.VarChar(255)
-  verificationStatus    LicenseVerificationStatus @default(PENDING) @map("verification_status")
-  isVerified            Boolean                   @default(false) @map("is_verified")
-  verifiedAt            DateTime?                 @map("verified_at") @db.Timestamp(6)
-  verifiedBy            LicenseVerifiedBy?        @default(PLATFORM) @map("verified_by")
+  id                    String             @id @default(uuid(7))
+  dentistId             String             @unique @map("dentist_id")
+  dentist               Dentist            @relation(fields: [dentistId], references: [id], onDelete: Cascade)
+  country               String             @db.VarChar(100)
+  city                  String             @db.VarChar(100)
+  registrationAuthority String             @map("registration_authority") @db.VarChar(255)
+  registrationNumber    String             @unique @map("registration_number")
+  licenseDocument       String?            @map("license_document") @db.VarChar(255)
+  verificationStatus    VerificationStatus @default(PENDING) @map("verification_status")
+  isVerified            Boolean            @default(false) @map("is_verified")
+  verifiedAt            DateTime?          @map("verified_at") @db.Timestamp(6)
+  verifiedBy            LicenseVerifiedBy? @default(PLATFORM) @map("verified_by")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
@@ -72,15 +74,15 @@ model DentistLicense {
 }
 
 model DentistLicenseVerification {
-  id                      String                    @id @default(uuid(7))
-  dentistId               String                    @map("dentist_id")
-  dentist                 Dentist                   @relation(fields: [dentistId], references: [id], onDelete: Cascade)
-  verificationStatus      LicenseVerificationStatus @default(PENDING) @map("verification_status")
-  isVerified              Boolean                   @default(false) @map("is_verified")
-  verifiedAt              DateTime?                 @map("verified_at") @db.Timestamp(6)
-  verifiedBy              LicenseVerifiedBy?        @default(PLATFORM) @map("verified_by")
-  verificationNote        String?                   @map("verification_note") @db.VarChar(255)
-  verificationRequestNote String?                   @map("verification_request_note") @db.VarChar(255)
+  id                      String             @id @default(uuid(7))
+  dentistId               String             @map("dentist_id")
+  dentist                 Dentist            @relation(fields: [dentistId], references: [id], onDelete: Cascade)
+  verificationStatus      VerificationStatus @default(PENDING) @map("verification_status")
+  isVerified              Boolean            @default(false) @map("is_verified")
+  verifiedAt              DateTime?          @map("verified_at") @db.Timestamp(6)
+  verifiedBy              LicenseVerifiedBy? @default(PLATFORM) @map("verified_by")
+  verificationNote        String?            @map("verification_note") @db.VarChar(255)
+  verificationRequestNote String?            @map("verification_request_note") @db.VarChar(255)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
@@ -104,6 +106,8 @@ model DentistOperationsVerification {
   verifiedBy              LicenseVerifiedBy? @default(PLATFORM) @map("verified_by")
   verificationNote        String?            @map("verification_note") @db.VarChar(255)
   verificationRequestNote String?            @map("verification_request_note") @db.VarChar(255)
+  verificationStatus      VerificationStatus @default(PENDING) @map("verification_status")
+  isApproved              Boolean            @default(false) @map("is_approved")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
@@ -123,6 +127,8 @@ model DentistClinicDepthVerification {
   verifiedBy              LicenseVerifiedBy? @default(PLATFORM) @map("verified_by")
   verificationNote        String?            @map("verification_note") @db.VarChar(255)
   verificationRequestNote String?            @map("verification_request_note") @db.VarChar(255)
+  verificationStatus      VerificationStatus @default(PENDING) @map("verification_status")
+  isApproved              Boolean            @default(false) @map("is_approved")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
@@ -169,4 +175,15 @@ model DentistVerificationProgress {
 
   @@index([dentistId])
   @@map("dentist_verification_progress")
+}
+
+model VerificationWeight {
+  id                String   @id @default(cuid())
+  licenseWeight     Float    @default(30) @map("license_weight")
+  operationsWeight  Float    @default(40) @map("operations_weight")
+  clinicDepthWeight Float    @default(30) @map("clinic_depth_weight")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("verification_weights")
 }

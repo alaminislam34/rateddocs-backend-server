@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { catchAsync } from '../utils/catchAsync.js';
+import { catchAsync } from '../shared/catchAsync.js';
 
 export const validateRequest = <T extends z.ZodTypeAny>(schema: T) => {
   return catchAsync(async (req, res, next) => {
@@ -9,9 +9,15 @@ export const validateRequest = <T extends z.ZodTypeAny>(schema: T) => {
       params: req.params,
     })) as Record<string, unknown>;
 
-    req.body = parsed.body;
-    req.query = parsed.query as Record<string, string>;
-    req.params = parsed.params as Record<string, string>;
+    if (parsed.body !== undefined) {
+      req.body = parsed.body;
+    }
+    if (parsed.query !== undefined) {
+      Object.assign(req.query, parsed.query);
+    }
+    if (parsed.params !== undefined) {
+      Object.assign(req.params, parsed.params);
+    }
     next();
   });
 };

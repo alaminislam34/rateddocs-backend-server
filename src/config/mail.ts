@@ -1,13 +1,13 @@
 import nodemailer from 'nodemailer';
-import { env } from './env.js';
+import { envVars } from './env.js';
 
 export const transporter = nodemailer.createTransport({
-  host: env.SMTP_HOST,
-  port: env.SMTP_PORT,
-  secure: env.SMTP_PORT === 465,
+  host: envVars.EMAIL_SENDER_SMTP_HOST as string,
+  port: Number(envVars.EMAIL_SENDER_SMTP_PORT),
+  secure: Number(envVars.EMAIL_SENDER_SMTP_PORT) === 465,
   auth: {
-    user: env.SMTP_USER,
-    pass: env.SMTP_PASS,
+    user: envVars.EMAIL_SENDER_SMTP_USER as string,
+    pass: envVars.EMAIL_SENDER_SMTP_PASS as string,
   },
 });
 

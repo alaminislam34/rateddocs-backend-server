@@ -2,27 +2,39 @@ import { Router } from 'express';
 import { toNodeHandler } from 'better-auth/node';
 import { auth } from '../../config/auth.js';
 import { validateRequest } from '../../middlewares/validateRequest.js';
-import { loginSchema, registerPatientSchema, verifyEmailSchema } from './auth.validation.js';
-import * as authController from './auth.controller.js';
+import {
+  loginSchema,
+  registerPatientSchema,
+  verifyEmailSchema,
+  resendOtpSchema,
+} from './auth.validation.js';
+import { AuthController } from './auth.controller.js';
 
 const router = Router();
 
-// Registration & Verification
-router.post('/register/patient', validateRequest(registerPatientSchema), authController.registerPatient);
-router.post('/verify-email', validateRequest(verifyEmailSchema), authController.verifyEmailOtp);
+router.post(
+  '/register/patient',
+  validateRequest(registerPatientSchema),
+  AuthController.registerPatient,
+);
+router.post('/verify-email', validateRequest(verifyEmailSchema), AuthController.verifyEmailOtp);
 
-// Credentials Logins
-router.post('/login/patient', validateRequest(loginSchema), authController.loginPatient);
-router.post('/login/dentist', validateRequest(loginSchema), authController.loginDentist);
-router.post('/login/admin', validateRequest(loginSchema), authController.loginAdmin);
+router.post('/login', validateRequest(loginSchema), AuthController.loginUser);
+
+router.post('/login/admin', validateRequest(loginSchema), AuthController.loginAdmin);
+
+router.post('/verify-2fa', validateRequest(verifyEmailSchema), AuthController.verify2faOtp);
+
+router.post('/resend-otp', validateRequest(resendOtpSchema), AuthController.resendOtp);
 
 // Google OAuth Login
-router.get('/login/google', authController.initiateGoogleLogin);
+router.get('/login/google', AuthController.initiateGoogleLoginController);
 
 // Google OAuth Callback (Handled by Better-Auth)
 router.get('/login/callback/google', toNodeHandler(auth));
 
-// Logout
-router.post('/logout', authController.logout);
+router.get('/current-user-session', AuthController.getSession);
+
+router.post('/logout', AuthController.logout);
 
 export const authRoutes = router;

@@ -12,3 +12,13 @@ export interface EmailCallbackData {
   url: string;
   token: string;
 }
+
+export interface AdminLoginPayload {
+  email: string;
+  password: string;
+}
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
