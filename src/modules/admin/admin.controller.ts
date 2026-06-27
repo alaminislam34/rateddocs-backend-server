@@ -111,6 +111,62 @@ const updateVerificationWeights = catchAsync(async (req: Request, res: Response)
   });
 });
 
+const getVerificationRequestsList = catchAsync(async (req: Request, res: Response) => {
+  const { status: verifyStatus, search, page, limit } = req.query;
+
+  const result = await AdminService.getVerificationRequestsList({
+    status: verifyStatus ? String(verifyStatus) : undefined,
+    search: search ? String(search) : undefined,
+    page: page ? Number(page) : undefined,
+    limit: limit ? Number(limit) : undefined,
+  });
+
+  res.status(status.OK).json({
+    success: true,
+    statusCode: status.OK,
+    message: 'Dentist verification queue retrieved successfully.',
+    data: result.data,
+    meta: result.meta,
+    status_counts: result.status_counts,
+  });
+});
+
+const approveLicensePost = catchAsync(async (req: Request, res: Response) => {
+  const dentistId = req.params.dentistId as string;
+  const result = await AdminService.verifyLicenseAdmin(dentistId, true, 'Approved by Admin');
+
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: 'License verification approved successfully.',
+    data: result,
+  });
+});
+
+const approveOperationsPost = catchAsync(async (req: Request, res: Response) => {
+  const dentistId = req.params.dentistId as string;
+  const result = await AdminService.verifyOperationsAdmin(dentistId, true, 'Approved by Admin');
+
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: 'Operations verification approved successfully.',
+    data: result,
+  });
+});
+
+const approveClinicDepthPost = catchAsync(async (req: Request, res: Response) => {
+  const dentistId = req.params.dentistId as string;
+  const result = await AdminService.verifyClinicDepthAdmin(dentistId, true, 'Approved by Admin');
+
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: 'Clinic depth verification approved successfully.',
+    data: result,
+  });
+});
+
 export const AdminController = {
   getVerificationsListAdmin,
   verifyLicenseAdmin,
@@ -118,4 +174,8 @@ export const AdminController = {
   verifyClinicDepthAdmin,
   getVerificationWeights,
   updateVerificationWeights,
+  getVerificationRequestsList,
+  approveLicensePost,
+  approveOperationsPost,
+  approveClinicDepthPost,
 };

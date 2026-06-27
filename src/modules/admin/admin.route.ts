@@ -12,6 +12,23 @@ router.use(authMiddleware(UserRole.ADMIN, UserRole.SUPER_ADMIN));
 
 router.get('/verifications', AdminController.getVerificationsListAdmin);
 
+router.get('/dentist-verification', AdminController.getVerificationRequestsList);
+
+router.post(
+  '/dentist-verification/:dentistId/approve-license',
+  AdminController.approveLicensePost,
+);
+
+router.post(
+  '/dentist-verification/:dentistId/approve-operation',
+  AdminController.approveOperationsPost,
+);
+
+router.post(
+  '/dentist-verification/:dentistId/approve-depth',
+  AdminController.approveClinicDepthPost,
+);
+
 router.patch(
   '/verify-license/:dentistId',
   validateRequest(verifyStepSchema),

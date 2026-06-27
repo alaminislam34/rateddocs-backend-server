@@ -45,3 +45,17 @@ enum DentistVerificationPhase {
   OPERATIONS
   CLINIC
 }
+
+enum DentistVerificationRequestStatus {
+  PENDING
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum ReferralStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  REJECTED
+}

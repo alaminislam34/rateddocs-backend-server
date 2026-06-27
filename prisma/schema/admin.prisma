@@ -8,3 +8,20 @@ model Admin {
 
     @@map("admin")
 }
+
+model VerificationRequest {
+    id                String                   @id @default(cuid())
+    dentistId         String                   @unique
+    dentist           User                     @relation(fields: [dentistId], references: [id], onDelete: Cascade)
+    verificationPhase DentistVerificationPhase
+
+    status           DentistVerificationRequestStatus @default(PENDING)
+    isVerified       Boolean                          @default(false)
+    verifiedAt       DateTime?
+    verificationNote String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("verificationRequests")
+}

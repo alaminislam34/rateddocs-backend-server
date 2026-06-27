@@ -631,12 +631,12 @@ const getVerificationProgress = async (userId: string): Promise<IVerificationPro
       : null,
     dentistOperations: operationsVerification
       ? {
-          jciCertificate: operationsVerification.jciCertificate,
-          walkthroughVideo: operationsVerification.walkthroughVideo,
-          signerName: operationsVerification.signerName,
-          signature: operationsVerification.signature,
-          agreedToGuarantee: operationsVerification.agreedToGuarantee,
-        }
+        jciCertificate: operationsVerification.jciCertificate,
+        walkthroughVideo: operationsVerification.walkthroughVideo,
+        signerName: operationsVerification.signerName,
+        signature: operationsVerification.signature,
+        agreedToGuarantee: operationsVerification.agreedToGuarantee,
+      }
       : null,
     procedures: (dentist.dentistProcedures || []).map((dp) => ({
       id: dp.id,

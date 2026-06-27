@@ -1,0 +1,68 @@
+model Wallet {
+    id     String @id @default(uuid(7))
+    userId String @unique @map("user_id")
+    user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    // Stripe Wallet
+    stripeWalletId        String? @unique @map("stripe_wallet_id")
+    stripeBalance         Float   @default(0.0) @map("stripe_balance")
+    stripeAvailableAmount Float   @default(0.0) @map("stripe_available_amount")
+
+    // Rewards Wallet
+    rewardsBalance Int @default(0) @map("rewards_balance")
+    pointsBalance  Int @default(0) @map("points_balance")
+
+    createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamp(6)
+    updatedAt          DateTime            @updatedAt @map("updated_at") @db.Timestamp(6)
+    stripePayouts      StripePayout[]
+    walletTransactions WalletTransaction[]
+
+    @@index([userId])
+    @@map("wallets")
+}
+
+model StripePayout {
+    id       String @id @default(uuid(7))
+    walletId String @map("wallet_id")
+    wallet   Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+    stripePayoutId     String   @unique @map("stripe_payout_id")
+    amount             Float
+    currency           String
+    status             String
+    arrivalDate        DateTime @map("arrival_date")
+    metadata           Json?
+    balanceTransaction String?  @map("balance_transaction")
+
+    createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+    updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+    @@index([walletId])
+    @@map("stripe_payouts")
+}
+
+model WalletTransaction {
+    id       String @id @default(uuid(7))
+    walletId String @map("wallet_id")
+    wallet   Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+    transactionType String   @map("transaction_type") // DEPOSIT, WITHDRAWAL, REWARD, REFERRAL
+    amount          Float
+    currency        String
+    balanceBefore   Float
+    balanceAfter    Float
+    transactionDate DateTime @default(now()) @map("transaction_date") @db.Timestamp(6)
+    status          String   @default("COMPLETED")
+
+    description   String?
+    referenceId   String?
+    referenceType String?
+    metadata      Json?
+    reference     Json?
+
+    createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+    updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+    @@index([walletId, transactionDate])
+    @@map("wallet_transactions")
+}

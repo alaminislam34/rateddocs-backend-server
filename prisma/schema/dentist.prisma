@@ -18,6 +18,8 @@ model Dentist {
   dentistClinicDepthVerification DentistClinicDepthVerification?
   dentistVerificationProgress    DentistVerificationProgress?
   treatmentPlans                 TreatmentPlan[]
+  referralHistories              ReferralHistory[]               @relation("ReferrerHistory")
+  referredBy                     ReferralHistory?                @relation("ReferredHistory")
 
   @@index([userId])
   @@index([phoneNumber])
@@ -186,4 +188,21 @@ model VerificationWeight {
   updatedAt         DateTime @updatedAt @map("updated_at")
 
   @@map("verification_weights")
+}
+
+model ReferralHistory {
+  id                String         @id @default(cuid())
+  referrerDentistId String         @map("referrer_dentist_id")
+  bonusAmount       Float
+  status            ReferralStatus @default(PENDING)
+
+  referrerDentist Dentist  @relation("ReferrerHistory", fields: [referrerDentistId], references: [id])
+  dentist         Dentist? @relation("ReferredHistory", fields: [dentistId], references: [id])
+  dentistId       String?  @unique @map("dentist_id")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  @@index([referrerDentistId])
+  @@map("referral_history")
 }

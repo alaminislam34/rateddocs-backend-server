@@ -495,7 +495,7 @@ const getSession = async (
   if (session.expiresAt < new Date()) {
     await prisma.session.delete({
       where: { id: session.id },
-    }).catch(() => {});
+    }).catch(() => { });
     return null;
   }
 

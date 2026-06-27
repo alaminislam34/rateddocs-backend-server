@@ -68,3 +68,8 @@ seed()
   .finally(async () => {
     await prisma.$disconnect();
   });
+
+// how to create it please give me command 
+// pnpm tsx src/scripts/seedSpecialties.ts
+
+
