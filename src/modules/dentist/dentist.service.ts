@@ -7,6 +7,7 @@ import {
   VerificationStatus,
   DentistVerificationPhase,
   Prisma,
+  ReferralStatus,
 } from '../../generated/prisma/index.js';
 import { uploadToCloudinary } from '../../shared/fileUpload.js';
 import {
@@ -92,36 +93,41 @@ const registerDentist = async (
   headers: Headers,
   headshotFile?: Express.Multer.File,
 ) => {
-  const { firstName, lastName, email, phoneNumber, gender, referralCode, password } =
-    payload;
+  const { firstName, lastName, email, phoneNumber, gender, referralCode, password } = payload;
 
   const existingUser = await prisma.user.findUnique({
     where: { email },
   });
 
+  // check user verification status and if register but email not verify then send otp again
+  // otherwise throw error
   if (existingUser) {
     if (existingUser.emailVerified) {
       throw new AppError(status.CONFLICT, 'User with this email already exists.', 'email');
     }
-    // Generate and send verification OTP
     const name = `${firstName} ${lastName}`;
     await generateAndSendOTP(email, name);
-
-    return {
-      needEmailVerify: true,
-      email,
-    };
+    return { needEmailVerify: true, email };
   }
 
+  // Find referrer if referralCode is provided
+  let referrerDentist = null;
+  if (referralCode) {
+    referrerDentist = await prisma.dentist.findUnique({
+      where: { referralCode },
+    });
+    if (!referrerDentist) {
+      throw new AppError(status.BAD_REQUEST, 'Invalid referral code', 'referralCode');
+    }
+  }
+
+  // register new user
   const name = `${firstName} ${lastName}`;
   const signUpResult = await auth.api.signUpEmail({
-    body: {
-      email,
-      password,
-      name,
-    },
+    body: { email, password, name },
     headers,
   });
+
 
   if (!signUpResult || !signUpResult.user) {
     throw new AppError(status.INTERNAL_SERVER_ERROR, 'Failed to register user in Better-Auth');
@@ -129,6 +135,7 @@ const registerDentist = async (
 
   const userId = signUpResult.user.id;
 
+  // Upload headshot to Cloudinary if provided
   let headshotUrl: string | undefined;
   if (headshotFile) {
     const uploadResult = await uploadToCloudinary(headshotFile.buffer, 'dentists/headshots');
@@ -136,6 +143,7 @@ const registerDentist = async (
   }
 
   const dentist = await prisma.$transaction(async (tx) => {
+    // 1. Update user details
     await tx.user.update({
       where: { id: userId },
       data: {
@@ -147,16 +155,32 @@ const registerDentist = async (
       },
     });
 
-    // Create Dentist record
+    // 2. Generate own referral code for the new dentist
+    const ownReferralCode = `${firstName.toLowerCase().replace(/[^a-z0-9]/g, '')}-${Math.random().toString(36).substring(2, 7)}`;
+
+    // 3. Create Dentist record
     const newDentist = await tx.dentist.create({
       data: {
         userId,
         phoneNumber,
-        referralCode,
+        referralCode: ownReferralCode,
+        referredById: referrerDentist ? referrerDentist.id : null,
       },
     });
 
-    // Create Dentist Verification Progress
+    // 4. Create ReferralHistory record if referred
+    if (referrerDentist) {
+      await tx.referralHistory.create({
+        data: {
+          referrerDentistId: referrerDentist.id,
+          dentistId: newDentist.id,
+          bonusAmount: 0.0, // default bonus
+          status: ReferralStatus.PENDING,
+        },
+      });
+    }
+
+    // 5. Create Dentist Verification Progress
     await tx.dentistVerificationProgress.create({
       data: {
         dentistId: newDentist.id,
@@ -169,7 +193,6 @@ const registerDentist = async (
     return newDentist;
   });
 
-  // 4. Generate and send verification OTP
   await generateAndSendOTP(email, name);
 
   return dentist;
@@ -270,7 +293,20 @@ const submitLicense = async (
   });
 
   if (!dentist) {
-    throw new AppError(status.NOT_FOUND, 'Dentist profile not found');
+    throw new AppError(status.NOT_FOUND, 'Dentist profile not found', 'dentist');
+  }
+
+  // Check if this registration number is already registered by another dentist
+  const existingLicense = await prisma.dentistLicense.findUnique({
+    where: { registrationNumber: payload.registrationNumber },
+  });
+
+  if (existingLicense && existingLicense.dentistId !== dentist.id) {
+    throw new AppError(
+      status.CONFLICT,
+      'This registration number is already registered to another dentist account.',
+      'registrationNumber',
+    );
   }
 
   if (!licenseFile) {

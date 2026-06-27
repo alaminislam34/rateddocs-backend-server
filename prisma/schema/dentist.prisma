@@ -5,6 +5,7 @@ model Dentist {
   phoneNumber  String     @map("phone_number") @db.VarChar(25)
   country      String?    @db.VarChar(100)
   referralCode String?    @unique @map("referral_code") @db.VarChar(50)
+  referredById String?    @map("referred_by_id")
   specialtyId  String?    @map("specialty_id")
   specialty    Specialty? @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
 

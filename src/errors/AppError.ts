@@ -7,16 +7,16 @@ export class AppError extends Error {
   constructor(
     statusCode: number,
     message: string,
-    stack?: string,
-    isOperational = true,
-    errorCode?: string,
     path?: string,
+    stack?: string,
+    errorCode?: string,
+    isOperational = true,
   ) {
     super(message);
     this.statusCode = statusCode;
-    this.isOperational = isOperational;
-    this.errorCode = errorCode;
     this.path = path;
+    this.errorCode = errorCode;
+    this.isOperational = isOperational;
 
     if (stack) {
       this.stack = stack;

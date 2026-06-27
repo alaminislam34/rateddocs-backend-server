@@ -3,7 +3,7 @@ import { AdminController } from './admin.controller.js';
 import { validateRequest } from '../../middlewares/validateRequest.js';
 import { authMiddleware } from '../../middlewares/auth.middleware.js';
 import { UserRole } from '../../generated/prisma/index.js';
-import { updateWeightsSchema, verifyStepSchema } from './admin.validation.js';
+import { updateWeightsSchema, verifyStepSchema, verifyPhaseSchema } from './admin.validation.js';
 
 const router = Router();
 
@@ -13,6 +13,11 @@ router.use(authMiddleware(UserRole.ADMIN, UserRole.SUPER_ADMIN));
 router.get('/verifications', AdminController.getVerificationsListAdmin);
 
 router.get('/dentist-verification', AdminController.getVerificationRequestsList);
+
+router.get(
+  '/dentist-verification/:dentistId',
+  AdminController.getDentistVerificationPhases,
+);
 
 router.post(
   '/dentist-verification/:dentistId/approve-license',
@@ -47,6 +52,12 @@ router.patch(
   AdminController.verifyClinicDepthAdmin,
 );
 
+router.patch(
+  '/verify-phase/:dentistId',
+  validateRequest(verifyPhaseSchema),
+  AdminController.verifyPhaseAdmin,
+);
+
 router.get('/verification-weights', AdminController.getVerificationWeights);
 
 router.post(
@@ -56,3 +67,4 @@ router.post(
 );
 
 export const adminRoutes = router;
+

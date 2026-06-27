@@ -83,6 +83,7 @@ const getVerificationsListAdmin = async (query: {
           image: true,
         },
       },
+      specialty: true,
       dentistProfessionalData: true,
       dentistLicense: true,
       dentistOperationsVerifications: true,
@@ -92,6 +93,11 @@ const getVerificationsListAdmin = async (query: {
         },
       },
       dentistVerificationProgress: true,
+      dentistProcedures: {
+        include: {
+          globalProcedure: true,
+        },
+      },
     },
     orderBy: {
       createdAt: 'desc',
@@ -549,6 +555,181 @@ const getVerificationRequestsList = async (query: {
   };
 };
 
+const getDentistVerificationPhases = async (dentistId: string) => {
+  const dentist = await prisma.dentist.findUnique({
+    where: { id: dentistId },
+    include: {
+      user: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          dentist: true,
+          image: true,
+        },
+      },
+      specialty: true,
+      dentistLicense: true,
+      dentistLicenseVerifications: {
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: 1,
+      },
+      dentistOperationsVerifications: true,
+      dentistClinicDepthVerification: {
+        include: {
+          procedureDocs: true,
+        },
+      },
+      dentistVerificationProgress: true,
+      dentistProcedures: {
+        include: {
+          globalProcedure: true,
+        },
+      },
+    },
+  });
+
+  if (!dentist) {
+    throw new AppError(status.NOT_FOUND, 'Dentist not found');
+  }
+
+  const lVer = dentist.dentistLicense?.verificationStatus || VerificationStatus.PENDING;
+  const op = dentist.dentistOperationsVerifications?.[0];
+  const oVer = op ? (op.isVerified ? VerificationStatus.APPROVED : op.verificationStatus) : VerificationStatus.PENDING;
+  const clinic = dentist.dentistClinicDepthVerification;
+  const cVer = clinic ? (clinic.isVerified ? VerificationStatus.APPROVED : clinic.verificationStatus) : VerificationStatus.PENDING;
+
+  let queueStatus: 'pending' | 'approved' | 'rejected' = 'pending';
+  if (lVer === VerificationStatus.APPROVED && oVer === VerificationStatus.APPROVED && cVer === VerificationStatus.APPROVED) {
+    queueStatus = 'approved';
+  } else if (lVer === VerificationStatus.REJECTED || oVer === VerificationStatus.REJECTED || cVer === VerificationStatus.REJECTED) {
+    queueStatus = 'rejected';
+  }
+
+  const latestLicenseVer = dentist.dentistLicenseVerifications?.[0];
+
+  const proceduresFeature = dentist.dentistProcedures.map((proc) => ({
+    id: proc.id,
+    procedure_name: proc.globalProcedure.name,
+    price: proc.price.toString(),
+    currency: 'USD',
+    option_notes: proc.notes || '',
+    is_active: proc.isActive,
+    procedure: proc.globalProcedureId,
+  }));
+
+  const materials = clinic?.procedureDocs.map((doc) => ({
+    own_procedure: doc.dentistProcedureId,
+    ce_certificate: doc.ceCertificate,
+    material_brands: doc.materialBrands,
+    invoice: doc.invoice,
+    protocol_pdf: doc.protocolPdf,
+  })) || [];
+
+  return {
+    id: dentist.id,
+    license_verification: lVer,
+    operations_verification: oVer,
+    clinical_verification: cVer,
+    face_match_score: 92,
+    created_at: dentist.createdAt.toISOString(),
+    updated_at: dentist.updatedAt.toISOString(),
+    dentist: {
+      id: dentist.id,
+      full_name: `${dentist.user.firstName || ''} ${dentist.user.lastName || ''}`.trim(),
+      specialty: dentist.specialty?.name || 'General',
+      rdv_score: dentist.dentistVerificationProgress?.rvdScore || 0,
+      created_at: dentist.createdAt.toISOString(),
+      updated_at: dentist.updatedAt.toISOString(),
+    },
+    license_step: dentist.dentistLicense
+      ? {
+        id: dentist.dentistLicense.id,
+        registration_authority_name: dentist.dentistLicense.registrationAuthority,
+        created_at: dentist.dentistLicense.createdAt.toISOString(),
+        updated_at: dentist.dentistLicense.updatedAt.toISOString(),
+        professional_headshot: dentist.user.image || '',
+        city: dentist.dentistLicense.city,
+        country: dentist.dentistLicense.country,
+        registration_no: dentist.dentistLicense.registrationNumber,
+        doc_type: 'LICENSE',
+        file: dentist.dentistLicense.licenseDocument || '',
+        status: lVer,
+        is_verified: dentist.dentistLicense.isVerified,
+        verified_at: dentist.dentistLicense.verifiedAt?.toISOString() || null,
+        reviewer_notes: latestLicenseVer?.verificationNote || '',
+        dentist: dentist.id,
+        verification: dentist.dentistLicense.id,
+        registration_authority: dentist.dentistLicense.registrationAuthority,
+      }
+      : null,
+    operation_step: op
+      ? {
+        id: op.id,
+        status: oVer,
+        is_verified: op.isVerified,
+        verified_at: op.verifiedAt?.toISOString() || null,
+        reviewer_notes: op.verificationNote || '',
+        dentist: dentist.id,
+        verification: op.id,
+        sterilization_verification: {
+          id: op.id,
+          has_jci_certificate: !!op.jciCertificate,
+          jci_certificate: op.jciCertificate,
+          walkthrough_video: op.walkthroughVideo,
+          certificate_number: null,
+          expiry_date: null,
+          issuing_authority: null,
+          issue_date: null,
+        },
+        no_surprise_guarantee: op.agreedToGuarantee
+          ? {
+            id: op.id,
+            allowed_variation_percent: '0',
+            signer_name: op.signerName || '',
+            typed_signature: op.signature || '',
+            accepted_terms: true,
+            signed_at: op.updatedAt.toISOString(),
+          }
+          : null,
+        procedures_feature: proceduresFeature,
+      }
+      : null,
+    clinical_step: clinic
+      ? {
+        id: clinic.id,
+        status: cVer,
+        is_verified: clinic.isVerified,
+        verified_at: clinic.verifiedAt?.toISOString() || null,
+        reviewer_notes: clinic.verificationNote || '',
+        dentist: dentist.id,
+        verification: clinic.id,
+        clinic_address: clinic.clinicAddress || '',
+        materials,
+      }
+      : null,
+    queue_status: queueStatus,
+  };
+};
+
+const verifyPhaseAdmin = async (
+  dentistId: string,
+  phase: 'ph1' | 'ph2' | 'ph3',
+  isApproved: boolean,
+  note?: string,
+) => {
+  if (phase === 'ph1') {
+    return await verifyLicenseAdmin(dentistId, isApproved, note);
+  } else if (phase === 'ph2') {
+    return await verifyOperationsAdmin(dentistId, isApproved, note);
+  } else {
+    return await verifyClinicDepthAdmin(dentistId, isApproved, note);
+  }
+};
+
 export const AdminService = {
   getVerificationsListAdmin,
   verifyLicenseAdmin,
@@ -557,4 +738,6 @@ export const AdminService = {
   getVerificationWeights,
   updateVerificationWeights,
   getVerificationRequestsList,
+  getDentistVerificationPhases,
+  verifyPhaseAdmin,
 };
